@@ -172,16 +172,47 @@ async function testDesktopExternalLinksUseRustAllowlistedCommand() {
   assert.equal(calls[0].args.url, "https://pay.ldxp.cn/shop/13QL6FLR");
 }
 
+async function testDroppedJsonConvertsImmediately() {
+  const { elements, context } = loadPageScript();
+  let prevented = false;
+  const file = {
+    name: "session.json",
+    async text() {
+      return JSON.stringify({
+        user: { email: "drop@example.com" },
+        account: { id: "account-drop", planType: "plus" },
+        accessToken: jwtWithPayload({ exp: 4_102_444_800 }),
+      });
+    },
+  };
+
+  await context.document.listeners.drop({
+    dataTransfer: { files: [file] },
+    preventDefault() { prevented = true; },
+  });
+
+  assert.equal(prevented, true);
+  assert.match(elements.get("#output").value, /drop@example\.com/);
+  assert.match(elements.get("#input-status").textContent, /读取 1 个文件/);
+}
+
 async function testDesktopUpstreamCheckReportsAuditedPins() {
+  const calls = [];
   const { elements } = loadPageScript({
     tauri: {
       core: {
         async invoke(command) {
-          assert.equal(command, "check_upstream_updates");
-          return [
-            { label: "CLIProxyAPI", status: "current" },
-            { label: "sub2api", status: "current" },
-          ];
+          calls.push(command);
+          if (command === "check_upstream_updates") {
+            return [
+              { label: "CLIProxyAPI", status: "current" },
+              { label: "sub2api", status: "current" },
+            ];
+          }
+          if (command === "check_app_update") {
+            return { available: false, currentVersion: "0.1.3", version: null };
+          }
+          throw new Error(`unexpected command: ${command}`);
         },
       },
     },
@@ -189,7 +220,42 @@ async function testDesktopUpstreamCheckReportsAuditedPins() {
   await dispatchAsync(elements.get("#check-upstream-updates"), "click");
   assert.equal(elements.get("#check-upstream-updates").disabled, false);
   assert.equal(elements.get("#check-upstream-updates").textContent, "检查更新");
-  assert.match(elements.get("#upstream-check-status").textContent, /均与当前审计提交一致/);
+  assert.deepEqual(calls.sort(), ["check_app_update", "check_upstream_updates"]);
+  assert.match(elements.get("#upstream-check-status").textContent, /两个算法映射均为当前审计版本/);
+}
+
+async function testSignedAppUpdateRequiresConfirmationThenInstalls() {
+  const calls = [];
+  const { elements } = loadPageScript({
+    tauri: {
+      core: {
+        async invoke(command) {
+          calls.push(command);
+          if (command === "check_upstream_updates") {
+            return [
+              { label: "CLIProxyAPI", status: "update_available", latestSha: "abcdef123456" },
+              { label: "sub2api", status: "current" },
+            ];
+          }
+          if (command === "check_app_update") {
+            return { available: true, currentVersion: "0.1.3", version: "0.1.4" };
+          }
+          if (command === "install_app_update") return null;
+          throw new Error(`unexpected command: ${command}`);
+        },
+      },
+    },
+  });
+
+  const button = elements.get("#check-upstream-updates");
+  await dispatchAsync(button, "click");
+  assert.equal(button.textContent, "更新并重启");
+  assert.match(elements.get("#upstream-check-status").textContent, /签名版 v0\.1\.4/);
+
+  await dispatchAsync(button, "click");
+  assert.equal(calls.at(-1), "install_app_update");
+  assert.equal(button.disabled, true);
+  assert.match(elements.get("#upstream-check-status").textContent, /正在重启/);
 }
 
 function dispatch(element, type) {
@@ -878,7 +944,7 @@ function testSub2apiToCpaBridgeOffersMergedJsonAndSplitZip() {
   assert.match(elements.get("#download-split").textContent, /拆分 ZIP（2）/);
   assert.match(elements.get("#output-subtitle").textContent, /合并 JSON/);
 
-  const zip = context.VaultKeySessionBridge.buildZipFromCpaFiles([
+  const zip = context.SessionConverterBridge.buildZipFromCpaFiles([
     { name: "codex-alpha.json", data: document.auths[0] },
     { name: "claude-beta.json", data: document.auths[1] },
   ]);
@@ -893,7 +959,7 @@ function testSub2apiToCpaBridgeOffersMergedJsonAndSplitZip() {
 
 function testDetectInputModeForBridgeFormats() {
   const { context } = loadPageScript();
-  const { detectInputMode } = context.VaultKeySessionBridge;
+  const { detectInputMode } = context.SessionConverterBridge;
 
   assert.equal(detectInputMode(JSON.stringify({
     type: "codex",
@@ -980,7 +1046,7 @@ function testSub2apiSplitZipBuildsMultipleFiles() {
   assert.match(splitButton.textContent, /拆分 ZIP（2）/);
 
   // Access internal state via rebuild: bridge files should zip cleanly.
-  const zip = context.VaultKeySessionBridge.buildZipFromSub2apiFiles([
+  const zip = context.SessionConverterBridge.buildZipFromSub2apiFiles([
     { name: "a.json", data: { type: "sub2api-data", version: 1, proxies: [], accounts: [{ name: "a" }] } },
     { name: "b.json", data: { type: "sub2api-data", version: 1, proxies: [], accounts: [{ name: "b" }] } },
   ]);
@@ -991,7 +1057,7 @@ function testSub2apiSplitZipBuildsMultipleFiles() {
 
 function testSourcePinsMatchHeaderBadges() {
   const { context } = loadPageScript();
-  const pins = context.VaultKeySessionBridge.SOURCE_PINS;
+  const pins = context.SessionConverterBridge.SOURCE_PINS;
   assert.equal(pins.length, 2);
   assert.equal(pins[0].label, "CLIProxyAPI");
   assert.equal(pins[0].branch, "main");
@@ -1002,11 +1068,11 @@ function testSourcePinsMatchHeaderBadges() {
   assert.equal(pins[1].shortSha, "cc67b1ac");
   assert.equal(pins[1].date, "2026-08-08");
   assert.equal(
-    context.VaultKeySessionBridge.formatSourcePinLabel(pins[0]),
+    context.SessionConverterBridge.formatSourcePinLabel(pins[0]),
     "CLIProxyAPI · 197f5204",
   );
   assert.equal(
-    context.VaultKeySessionBridge.formatSourcePinLabel(pins[1]),
+    context.SessionConverterBridge.formatSourcePinLabel(pins[1]),
     "sub2api · cc67b1ac",
   );
 }
@@ -1214,7 +1280,7 @@ function testSub2apiAgentIdentityAccountCannotConvertToCpa() {
     },
   };
 
-  assert.equal(context.VaultKeySessionBridge.looksLikeSub2apiAccount(account), true);
+  assert.equal(context.SessionConverterBridge.looksLikeSub2apiAccount(account), true);
 
   dispatch(modeButtons.find((button) => button.dataset.mode === "sub-to-cpa"), "click");
   input.value = JSON.stringify({ type: "sub2api-data", version: 1, proxies: [], accounts: [account] });
@@ -1226,7 +1292,9 @@ function testSub2apiAgentIdentityAccountCannotConvertToCpa() {
 
 async function main() {
   await testDesktopExternalLinksUseRustAllowlistedCommand();
+  await testDroppedJsonConvertsImmediately();
   await testDesktopUpstreamCheckReportsAuditedPins();
+  await testSignedAppUpdateRequiresConfirmationThenInstalls();
   testSub2apiAccountUsesAccessTokenExpiry();
   testCurrentChatGptSessionWorksWithoutSessionToken();
   testSub2apiAccountsUseTheirOwnAccessTokenExpiry();

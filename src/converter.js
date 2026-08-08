@@ -9,9 +9,9 @@
           codexmanager: "Codex-Manager",
         };
 
-        const bridge = globalThis.VaultKeySessionBridge;
+        const bridge = globalThis.SessionConverterBridge;
         if (!bridge) {
-          throw new Error("VaultKeySessionBridge is missing; load bridge.js before converter.js");
+          throw new Error("SessionConverterBridge is missing; load bridge.js before converter.js");
         }
 
         const tauri = globalThis.__TAURI__ || null;
@@ -42,6 +42,7 @@
           bridgeOutput: null,
           autoDetectMode: true,
           lastAutoMode: null,
+          pendingAppUpdate: null,
         };
 
         const elements = {
@@ -56,6 +57,7 @@
           downloadOutput: document.querySelector("#download-output"),
           downloadSplit: document.querySelector("#download-split"),
           fileInput: document.querySelector("#file-input"),
+          fileDropZone: document.querySelector("#file-drop-zone"),
           formatButtons: Array.from(document.querySelectorAll("[data-format]")),
           formatGroup: document.querySelector("#format-group"),
           input: document.querySelector("#session-input"),
@@ -1227,34 +1229,65 @@
           element.classList.toggle("is-warning", tone === "warning");
         }
 
+        async function installPendingAppUpdate() {
+          const update = state.pendingAppUpdate;
+          if (!update?.available || !elements.upstreamCheckButton || !elements.upstreamCheckStatus) return;
+          elements.upstreamCheckButton.disabled = true;
+          elements.upstreamCheckButton.textContent = "安装中…";
+          setStatus(elements.upstreamCheckStatus, `正在后台下载并验证 v${update.version}；安装完成后应用会自动重启。`);
+          try {
+            await tauri.core.invoke("install_app_update");
+            setStatus(elements.upstreamCheckStatus, "更新已安装，正在重启…", "ok");
+          } catch (error) {
+            state.pendingAppUpdate = null;
+            elements.upstreamCheckButton.disabled = false;
+            elements.upstreamCheckButton.textContent = "重新检查";
+            setStatus(elements.upstreamCheckStatus, `安装失败：${error instanceof Error ? error.message : String(error)}`, "error");
+          }
+        }
+
         async function checkUpstreamUpdates() {
           if (!elements.upstreamCheckButton || !elements.upstreamCheckStatus) return;
           if (!isDesktopRuntime) {
             setStatus(elements.upstreamCheckStatus, "请在桌面版中检查上游更新。", "warning");
             return;
           }
+          if (state.pendingAppUpdate?.available) {
+            await installPendingAppUpdate();
+            return;
+          }
           elements.upstreamCheckButton.disabled = true;
           elements.upstreamCheckButton.textContent = "检查中…";
-          setStatus(elements.upstreamCheckStatus, "正在连接两个固定 GitHub 上游…");
+          setStatus(elements.upstreamCheckStatus, "正在检查两个算法上游与本软件正式版本…");
           try {
-            const checks = await tauri.core.invoke("check_upstream_updates");
+            const [checks, appUpdate] = await Promise.all([
+              tauri.core.invoke("check_upstream_updates"),
+              tauri.core.invoke("check_app_update"),
+            ]);
             const updates = checks.filter((item) => item.status === "update_available");
             const unknown = checks.filter((item) => item.status === "unknown");
-            if (updates.length) {
+            state.pendingAppUpdate = appUpdate?.available ? appUpdate : null;
+            if (state.pendingAppUpdate) {
+              const upstreamNote = updates.length
+                ? `；其中 ${updates.map((item) => item.label).join("、")} 的映射已发生变化`
+                : "";
+              setStatus(elements.upstreamCheckStatus, `已发布签名版 v${appUpdate.version}${upstreamNote}。点击“更新并重启”后将在后台验证并安装。`, "warning");
+              elements.upstreamCheckButton.textContent = "更新并重启";
+            } else if (updates.length) {
               const summary = updates
                 .map((item) => `${item.label} ${String(item.latestSha || "").slice(0, 8)}`)
                 .join("、");
-              setStatus(elements.upstreamCheckStatus, `发现 ${updates.length} 个上游更新：${summary}。需复核映射后发布新版。`, "warning");
+              setStatus(elements.upstreamCheckStatus, `发现算法上游变化：${summary}。需完成映射审计并发布签名版后才能安装。`, "warning");
             } else if (unknown.length) {
               setStatus(elements.upstreamCheckStatus, `${unknown.length} 个上游暂时无法检查；未自动更改任何代码。`, "warning");
             } else {
-              setStatus(elements.upstreamCheckStatus, "两个上游均与当前审计提交一致。", "ok");
+              setStatus(elements.upstreamCheckStatus, `两个算法映射均为当前审计版本；软件 v${appUpdate.currentVersion} 已是最新正式版。`, "ok");
             }
           } catch (error) {
             setStatus(elements.upstreamCheckStatus, `检查失败：${error instanceof Error ? error.message : String(error)}`, "error");
           } finally {
             elements.upstreamCheckButton.disabled = false;
-            elements.upstreamCheckButton.textContent = "检查更新";
+            if (!state.pendingAppUpdate) elements.upstreamCheckButton.textContent = "检查更新";
           }
         }
 
@@ -2016,6 +2049,7 @@
         elements.removeDeadButton.addEventListener("click", removeDeadAccountsFromOutput);
         elements.downloadCleanButton.addEventListener("click", downloadCleanOutput);
         elements.pickFiles.addEventListener("click", () => elements.fileInput.click());
+        elements.fileDropZone?.addEventListener("click", () => elements.fileInput.click());
         elements.fileInput.addEventListener("change", (event) => {
           readFiles(event.target.files);
           event.target.value = "";
@@ -2057,16 +2091,21 @@
           if (!event.dataTransfer?.types?.includes("Files")) return;
           event.preventDefault();
           document.body.classList.add("is-file-dragging");
+          elements.fileDropZone?.classList.add("is-dragging");
           event.dataTransfer.dropEffect = "copy";
         });
         document.addEventListener?.("dragleave", (event) => {
-          if (!event.relatedTarget) document.body.classList.remove("is-file-dragging");
+          if (!event.relatedTarget) {
+            document.body.classList.remove("is-file-dragging");
+            elements.fileDropZone?.classList.remove("is-dragging");
+          }
         });
         document.addEventListener?.("drop", (event) => {
           if (!event.dataTransfer?.files?.length) return;
           event.preventDefault();
           document.body.classList.remove("is-file-dragging");
-          readFiles(event.dataTransfer.files);
+          elements.fileDropZone?.classList.remove("is-dragging");
+          return readFiles(event.dataTransfer.files);
         });
         updateModeChrome();
         updateOutput();

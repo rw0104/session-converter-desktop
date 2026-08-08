@@ -23,17 +23,19 @@ Session Converter 是单窗口、小体量、无插件生态的桌面工具，�
 - 应用只有一个原生进程及系统 WebView 的平台进程；单实例插件会把重复启动聚焦回主窗口。
 - 发布包不包含 Chromium、Node.js、Python 或数据库。
 - 转换核心无 npm 运行时依赖。
-- Rust 仅增加 Tauri、原生对话框/打开器插件，以及使用 rustls 的 `reqwest`。
+- Rust 仅增加 Tauri、原生对话框/打开器/签名更新插件，以及使用 rustls 的 `reqwest`。
 
 ## IPC 合约
 
-WebView 只调用四个 Rust 命令：
+WebView 只调用六个 Rust 命令：
 
 | 命令 | 输入 | 输出 | 权限边界 |
 | --- | --- | --- | --- |
 | `save_output_file` | 建议文件名、字节数组 | 用户选择的最终路径 | Rust 内核打开原生保存对话框；64 MiB 上限 |
 | `probe_chatgpt_workspace` | access token、可选空间 ID | 状态、阶段、错误码、模型 | 仅固定 `chatgpt.com/backend-api/codex` 地址 |
 | `check_upstream_updates` | 无 | 两个上游的固定提交比较结果 | 仅固定 GitHub 公共仓库；不接收 URL、仓库或分支参数 |
+| `check_app_update` | 无 | 当前版本和可用正式版本 | 只读取内置 GitHub Release 更新端点 |
+| `install_app_update` | 无 | 安装错误或进程重启 | 下载后必须通过内置公钥验签；成功安装后自动重启 |
 | `open_external_url` | HTTPS URL | 成功或错误 | Rust 校验 `github.com`、`pay.ldxp.cn`、`chatgpt.com` 白名单后调用系统默认浏览器 |
 
 转换本身不跨 IPC；这样避免在每次字段转换时产生序列化和进程切换开销。
@@ -47,7 +49,7 @@ WebView 只调用四个 Rust 命令：
 
 可选健康检测是独立路径：仅在按钮点击后，把当前条目的 access token 交给 Rust；Rust 完成一次最小 Codex 请求后立即释放请求数据。
 
-上游更新检查同样只在用户点击后执行。它只读取两个公开仓库的 `main` 最新提交，与随应用发布的审计 SHA 比较；不会拉取源码、修改转换算法、下载二进制或自动升级应用。
+更新检查同样只在用户点击后执行。它读取两个公开仓库的 `main` 最新提交，与随应用发布的审计 SHA 比较，同时读取本仓库的正式 Release。上游变化本身不会拉取源码或修改转换算法；用户再次确认后，只会安装通过 Tauri 公钥验签的本项目更新包并自动重启。
 
 窗口尺寸与位置由官方 window-state 插件恢复；HTML5 文件拖放直接提供浏览器 `File` 对象，不额外开放任意路径读取命令。
 

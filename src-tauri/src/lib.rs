@@ -1,3 +1,4 @@
+mod app_update;
 mod health;
 mod upstream;
 
@@ -95,9 +96,12 @@ pub fn run() {
     builder
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             save_output_file,
             open_external_url,
+            app_update::check_app_update,
+            app_update::install_app_update,
             health::probe_chatgpt_workspace,
             upstream::check_upstream_updates
         ])

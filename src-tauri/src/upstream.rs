@@ -124,7 +124,7 @@ pub async fn check_upstream_updates() -> Vec<UpstreamCheck> {
         let response = match client
             .get(url)
             .header(ACCEPT, "application/vnd.github+json")
-            .header(USER_AGENT, "session-converter-desktop/0.1.2")
+            .header(USER_AGENT, "session-converter-desktop/0.1.3")
             .send()
             .await
         {

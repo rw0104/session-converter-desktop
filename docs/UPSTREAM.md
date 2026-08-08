@@ -14,7 +14,7 @@
 | CPA | [router-for-me/CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) | `197f520426374e514218ed155933ac546c98d345`（短：`197f5204`） | 2026-08-08 | `internal/auth/codex/token.go`（`CodexTokenStorage`）、`jwt_parser.go` |
 | sub2api | [Wei-Shaw/sub2api](https://github.com/Wei-Shaw/sub2api) | `cc67b1aca1d3b590609abef2fcd3a6ca31c5c651`（短：`cc67b1ac`） | 2026-08-08 | `backend/internal/handler/admin/account_codex_import.go`、`backend/internal/pkg/openai/oauth.go`（`ClientID`） |
 
-页面顶部「上游版本」由 `bridge.js` 的 **`SOURCE_PINS`** 渲染（HTML 含首屏静态回退）。桌面版的“检查更新”只比较固定仓库 `main` 最新提交与这些审计钉，不下载或执行代码。两仓更新后：
+页面顶部「算法与软件更新」由 `bridge.js` 的 **`SOURCE_PINS`** 渲染（HTML 含首屏静态回退）。桌面版会比较固定仓库 `main` 最新提交与这些审计钉，同时检查本仓库正式 Release。算法上游源码不会被直接下载或执行；只有完成映射复核并发布的签名安装包可以在应用内更新。两仓更新后：
 
 1. diff 上表对应文件；
 2. 改映射算法；
@@ -65,9 +65,9 @@ Agent Identity 行为要点（对齐 `2730c1c4`）：
 
 - 从上游 `docs/index.html` 导入功能实现。
 - 把内联样式和脚本拆分为 `converter.css` 与 `converter.js`，以适配严格的 Content Security Policy。
-- 增加 VaultKey 导航、隐私说明和上游署名。
+- 增加独立桌面导航、隐私说明和上游署名。
 - 移除与格式转换无关的第三方频道推广。
-- 增加 VaultKey 本地扩展“实际模型检测与清理”：用户主动点击后，浏览器调用同源固定接口 `/api/tools/session-health`；服务端按官方 Codex 链路读取模型列表并发送最小 Responses 请求。记录包含空间 ID 时发送 `ChatGPT-Account-ID`，HTTP 401、402、403 与本地过期进入可清理集合；此功能不属于上游固定提交。
+- 增加本地扩展“实际模型检测与清理”：用户主动点击后，浏览器调用同源固定接口 `/api/tools/session-health`；服务端按官方 Codex 链路读取模型列表并发送最小 Responses 请求。记录包含空间 ID 时发送 `ChatGPT-Account-ID`，HTTP 401、402、403 与本地过期进入可清理集合；此功能不属于上游固定提交。
 - 服务端为该路径设置严格 CSP，`connect-src` 只允许 `'self'`；检测接口不接收任意 URL、模型或请求体，不持久化 access token，并设置来源限流和全局并发限制。
 - 不使用 localStorage、sessionStorage、IndexedDB 或 Cookie，页面刷新后不恢复凭证或测活结果。
 - 2026-07-24：按上表钉死提交对齐 sub2api/CPA 账户导出字段（P0）。
@@ -83,4 +83,4 @@ Agent Identity 行为要点（对齐 `2730c1c4`）：
 - 2026-08-08：检测开始读取最多 256 KiB 的 SSE 响应并识别流内错误。明确停用/鉴权错误才标记不可用；`server_is_overloaded`、限流、网络错误和 5xx 保持未知，避免误清理。
 - 2026-08-08：原始 Session 转换上游仍为 `a097eb15`，没有新提交。本项目继续以 access JWT `exp` 为 token 到期依据，`sessionToken` 为可选字段，Session Cookie `expires` 只存入 `extra.session_expires_at`。
 
-本地检测只筛除确认 401、402、403 或本地确认过期的转换项，不改写其余输出字段。真实模型检测会产生极少量模型用量。后续升级必须重新核对 CLIProxyAPI / sub2api 账户 schema 与官方 Codex 请求协议，并执行安全审计、上游测试和 VaultKey 回归测试。
+本地检测只筛除确认 401、402、403 或本地确认过期的转换项，不改写其余输出字段。真实模型检测会产生极少量模型用量。后续升级必须重新核对 CLIProxyAPI / sub2api 账户 schema 与官方 Codex 请求协议，并执行安全审计、上游测试和桌面应用回归测试。

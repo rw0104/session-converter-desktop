@@ -1,4 +1,4 @@
-/* VaultKey CPA ↔ sub2api bridge algorithms.
+/* Session Converter CPA ↔ sub2api bridge algorithms.
  * Browser-local only; no network.
  * Upstream pins live in SOURCE_PINS — update there when re-mapping algorithms.
  */
@@ -1132,7 +1132,7 @@
 }`,
   };
 
-  globalThis.VaultKeySessionBridge = {
+  globalThis.SessionConverterBridge = {
     SOURCE_PINS,
     formatSourcePinLabel,
     renderSourcePins,

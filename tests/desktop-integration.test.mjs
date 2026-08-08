@@ -14,16 +14,18 @@ test('desktop page is standalone and exposes intentional resource links', async 
 
   assert.match(html, /Session Converter/);
   assert.doesNotMatch(html, /系统 WebView \+ Rust|Tauri 2\.11|runtime-summary/);
-  assert.match(html, /src="\.\/bridge\.js\?v=0\.1\.2"/);
-  assert.match(html, /src="\.\/converter\.js\?v=0\.1\.2"/);
+  assert.match(html, /src="\.\/bridge\.js\?v=0\.1\.3"/);
+  assert.match(html, /src="\.\/converter\.js\?v=0\.1\.3"/);
   assert.match(html, /id="check-upstream-updates"/);
+  assert.match(html, /id="file-drop-zone"/);
+  assert.match(html, /拖入 JSON 即可转换/);
   assert.match(html, /部分响应还含 <code>sessionToken<\/code>/);
   assert.doesNotMatch(html, /JSON 包含 accessToken 和 sessionToken/);
   assert.doesNotMatch(html, /add phone|手机绑定验证/);
   assert.match(html, /账号风险验证或 MFA/);
   assert.match(html, /https:\/\/github\.com\/rw0104\/session-converter-desktop/);
   assert.match(html, /https:\/\/pay\.ldxp\.cn\/shop\/13QL6FLR/);
-  assert.doesNotMatch(html, /项目主页|gpt-account-promo|返回兑换页|VaultKey · 凭证格式转换/);
+  assert.doesNotMatch(html, /项目主页|gpt-account-promo|返回兑换页/);
   assert.doesNotMatch(html, /<script(?![^>]+src=)[^>]*>/i);
   assert.doesNotMatch(html, /<style(?:\s|>)/i);
   assert.match(main, /windows_subsystem = "windows"/);
@@ -39,6 +41,8 @@ test('conversion remains local and desktop-only capabilities are explicit', asyn
 
   assert.match(converter, /probe_chatgpt_workspace/);
   assert.match(converter, /check_upstream_updates/);
+  assert.match(converter, /check_app_update/);
+  assert.match(converter, /install_app_update/);
   assert.match(converter, /open_external_url/);
   assert.match(converter, /save_output_file/);
   assert.doesNotMatch(converter, /tauri\.dialog\.save/);
@@ -47,6 +51,11 @@ test('conversion remains local and desktop-only capabilities are explicit', asyn
 
   const parsedConfig = JSON.parse(config);
   assert.equal(parsedConfig.app.withGlobalTauri, true);
+  assert.equal(parsedConfig.bundle.createUpdaterArtifacts, true);
+  assert.match(parsedConfig.plugins.updater.pubkey, /^dW50cnVzdGVk/);
+  assert.deepEqual(parsedConfig.plugins.updater.endpoints, [
+    'https://github.com/rw0104/session-converter-desktop/releases/latest/download/latest.json',
+  ]);
   assert.match(parsedConfig.app.security.csp, /connect-src ipc: http:\/\/ipc\.localhost/);
   assert.match(parsedConfig.app.security.csp, /object-src 'none'/);
 
@@ -72,9 +81,10 @@ test('Rust health checks are pinned to Codex and never accept arbitrary URLs', a
 });
 
 test('upstream and external-link commands only use fixed destinations', async () => {
-  const [upstream, shell] = await Promise.all([
+  const [upstream, shell, appUpdate] = await Promise.all([
     read('src-tauri', 'src', 'upstream.rs'),
     read('src-tauri', 'src', 'lib.rs'),
+    read('src-tauri', 'src', 'app_update.rs'),
   ]);
 
   assert.match(upstream, /https:\/\/api\.github\.com\/repos/);
@@ -84,6 +94,9 @@ test('upstream and external-link commands only use fixed destinations', async ()
   assert.doesNotMatch(upstream, /check_upstream_updates\([^)]*(url|repository|branch)/);
   assert.match(shell, /EXTERNAL_HOSTS: \[&str; 3\]/);
   assert.match(shell, /open_external_url\(app: tauri::AppHandle, url: String\)/);
+  assert.match(shell, /tauri_plugin_updater::Builder/);
+  assert.match(appUpdate, /download_and_install/);
+  assert.match(appUpdate, /app\.restart\(\)/);
 });
 
 test('upstream schema pins and license provenance travel with the extraction', async () => {
