@@ -29,7 +29,7 @@
   ]);
 
   function formatSourcePinLabel(pin) {
-    return `${pin.label} ${pin.branch}: ${pin.shortSha}, ${pin.date}`;
+    return `${pin.label} · ${pin.shortSha}`;
   }
 
   function renderSourcePins(root) {
@@ -44,7 +44,7 @@
         href="${pin.commitUrl}"
         target="_blank"
         rel="noopener noreferrer"
-        title="打开 ${pin.label} 对应提交 ${pin.fullSha}"
+        title="打开 ${pin.label} ${pin.branch} ${pin.fullSha}（${pin.date}）"
         data-source-pin="${pin.id}"
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

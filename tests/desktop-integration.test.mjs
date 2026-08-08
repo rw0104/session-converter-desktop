@@ -6,16 +6,22 @@ import { join } from 'node:path';
 const root = process.cwd();
 const read = (...parts) => readFile(join(root, ...parts), 'utf8');
 
-test('desktop page is standalone and contains no VaultKey commerce integration', async () => {
-  const html = await read('src', 'index.html');
+test('desktop page is standalone and exposes intentional resource links', async () => {
+  const [html, main] = await Promise.all([
+    read('src', 'index.html'),
+    read('src-tauri', 'src', 'main.rs'),
+  ]);
 
   assert.match(html, /Session Converter/);
-  assert.match(html, /系统 WebView · Rust 内核/);
-  assert.match(html, /src="\.\/bridge\.js"/);
-  assert.match(html, /src="\.\/converter\.js"/);
-  assert.doesNotMatch(html, /pay\.ldxp\.cn|返回兑换页|VaultKey · 凭证格式转换/);
+  assert.match(html, /系统 WebView \+ Rust/);
+  assert.match(html, /src="\.\/bridge\.js\?v=0\.1\.1"/);
+  assert.match(html, /src="\.\/converter\.js\?v=0\.1\.1"/);
+  assert.match(html, /https:\/\/github\.com\/rw0104\/session-converter-desktop/);
+  assert.match(html, /https:\/\/pay\.ldxp\.cn\/shop\/13QL6FLR/);
+  assert.doesNotMatch(html, /项目主页|gpt-account-promo|返回兑换页|VaultKey · 凭证格式转换/);
   assert.doesNotMatch(html, /<script(?![^>]+src=)[^>]*>/i);
   assert.doesNotMatch(html, /<style(?:\s|>)/i);
+  assert.match(main, /windows_subsystem = "windows"/);
 });
 
 test('conversion remains local and desktop-only capabilities are explicit', async () => {

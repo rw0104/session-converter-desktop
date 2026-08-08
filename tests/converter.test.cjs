@@ -926,11 +926,11 @@ function testSourcePinsMatchHeaderBadges() {
   assert.equal(pins[1].date, "2026-07-25");
   assert.equal(
     context.VaultKeySessionBridge.formatSourcePinLabel(pins[0]),
-    "CLIProxyAPI main: 42a00a2a, 2026-07-26",
+    "CLIProxyAPI · 42a00a2a",
   );
   assert.equal(
     context.VaultKeySessionBridge.formatSourcePinLabel(pins[1]),
-    "sub2api main: 2730c1c4, 2026-07-25",
+    "sub2api · 2730c1c4",
   );
 }
 
