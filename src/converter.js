@@ -75,6 +75,8 @@
           output: document.querySelector("#output"),
           outputStatus: document.querySelector("#output-status"),
           outputSubtitle: document.querySelector("#output-subtitle"),
+          upstreamCheckButton: document.querySelector("#check-upstream-updates"),
+          upstreamCheckStatus: document.querySelector("#upstream-check-status"),
           pickFiles: document.querySelector("#pick-files"),
           sessionGuide: document.querySelector("#session-guide"),
           statCount: document.querySelector("#stat-count"),
@@ -1140,6 +1142,16 @@
           return state.sub2apiFiles.length > 1;
         }
 
+        function splitExportDetails() {
+          if (state.mode === "sub-to-cpa" && state.cpaFiles.length > 1) {
+            return { kind: "cpa", count: state.cpaFiles.length };
+          }
+          if (canDownloadSub2apiSplitZip()) {
+            return { kind: "sub2api", count: state.sub2apiFiles.length };
+          }
+          return null;
+        }
+
         function maybeAutoDetectMode(text) {
           if (!state.autoDetectMode || !text.trim()) {
             state.lastAutoMode = null;
@@ -1213,6 +1225,37 @@
           element.classList.toggle("is-ok", tone === "ok");
           element.classList.toggle("is-error", tone === "error");
           element.classList.toggle("is-warning", tone === "warning");
+        }
+
+        async function checkUpstreamUpdates() {
+          if (!elements.upstreamCheckButton || !elements.upstreamCheckStatus) return;
+          if (!isDesktopRuntime) {
+            setStatus(elements.upstreamCheckStatus, "请在桌面版中检查上游更新。", "warning");
+            return;
+          }
+          elements.upstreamCheckButton.disabled = true;
+          elements.upstreamCheckButton.textContent = "检查中…";
+          setStatus(elements.upstreamCheckStatus, "正在连接两个固定 GitHub 上游…");
+          try {
+            const checks = await tauri.core.invoke("check_upstream_updates");
+            const updates = checks.filter((item) => item.status === "update_available");
+            const unknown = checks.filter((item) => item.status === "unknown");
+            if (updates.length) {
+              const summary = updates
+                .map((item) => `${item.label} ${String(item.latestSha || "").slice(0, 8)}`)
+                .join("、");
+              setStatus(elements.upstreamCheckStatus, `发现 ${updates.length} 个上游更新：${summary}。需复核映射后发布新版。`, "warning");
+            } else if (unknown.length) {
+              setStatus(elements.upstreamCheckStatus, `${unknown.length} 个上游暂时无法检查；未自动更改任何代码。`, "warning");
+            } else {
+              setStatus(elements.upstreamCheckStatus, "两个上游均与当前审计提交一致。", "ok");
+            }
+          } catch (error) {
+            setStatus(elements.upstreamCheckStatus, `检查失败：${error instanceof Error ? error.message : String(error)}`, "error");
+          } finally {
+            elements.upstreamCheckButton.disabled = false;
+            elements.upstreamCheckButton.textContent = "检查更新";
+          }
         }
 
         function resetLiveChecks() {
@@ -1493,7 +1536,13 @@
               data: item.cpa,
             }));
             if (files.length > 1) {
-              downloadBlob(new Blob([bridge.buildZipFromCpaFiles(files)], { type: "application/zip" }), `cliproxyapi-auth-files.clean.${getTimestampToken()}.zip`);
+              downloadJsonDocument({
+                type: "cliproxyapi-auth-list",
+                version: 1,
+                exported_at: new Date().toISOString(),
+                note: "清理后的合并 JSON 清单；auths 包含全部保留账号。",
+                auths: files.map((file) => file.data),
+              }, `cliproxyapi-auth-list.clean.${getTimestampToken()}.json`);
             } else if (files.length === 1) {
               downloadBlob(
                 new Blob([JSON.stringify(files[0].data, null, 2)], { type: "application/json;charset=utf-8" }),
@@ -1536,12 +1585,12 @@
             type: "cliproxyapi-auth-list",
             version: 1,
             exported_at: now,
-            note: "预览用清单。实际下载会生成 ZIP，里面每个账号一个 CLIProxyAPI 原生 auth JSON 文件。",
+            note: "合并 JSON 清单；auths 包含全部转换结果。需要 CLIProxyAPI 原生单账号文件时可另选拆分 ZIP。",
             auths,
           };
-          state.downloadKind = auths.length > 1 ? "zip" : "json";
+          state.downloadKind = "json";
           state.downloadFileName = auths.length > 1
-            ? "cliproxyapi-auth-files.zip"
+            ? "cliproxyapi-auth-list.json"
             : (state.cpaFiles[0]?.name || "codex-account.json");
           state.sub2apiFiles = [];
         }
@@ -1587,8 +1636,8 @@
             elements.input.placeholder = '[{"type":"codex","email":"...","access_token":"...","account_id":"...","expired":"..."}]';
           } else {
             if (elements.inputTitle) elements.inputTitle.textContent = "sub2api 导出 JSON";
-            if (elements.inputHint) elements.inputHint.textContent = "粘贴 sub2api-data / accounts 数组，或拖入导出文件。多账号下载为 CPA ZIP。";
-            if (elements.modeHint) elements.modeHint.textContent = "sub2api 账号 → CLIProxyAPI auth 文件；多账号时下载 ZIP。";
+            if (elements.inputHint) elements.inputHint.textContent = "粘贴 sub2api-data / accounts 数组，或拖入导出文件。多账号可下载合并 JSON 或拆分 ZIP。";
+            if (elements.modeHint) elements.modeHint.textContent = "sub2api 账号 → CLIProxyAPI auth；合并与拆分由你选择。";
             if (elements.bridgeGuideTitle) elements.bridgeGuideTitle.textContent = "sub2api → CPA";
             if (elements.bridgeGuideBody) {
               elements.bridgeGuideBody.textContent = "输入 type=sub2api-data 的导出包或单个 account。gemini 仅支持历史单向迁移；openai / anthropic / grok / antigravity 可还原为 CPA。";
@@ -1609,16 +1658,17 @@
           state.outputText = outputText;
           elements.output.value = outputText;
           elements.copyOutput.disabled = !outputText;
-          elements.downloadOutput.disabled = !outputText && !(state.downloadKind === "zip" && state.cpaFiles.length);
+          elements.downloadOutput.disabled = !outputText;
           elements.statCount.textContent = String(state.converted.length);
           elements.statErrors.textContent = String(state.skipped.length);
 
-          const canSplitSub2api = canDownloadSub2apiSplitZip();
+          const splitDetails = splitExportDetails();
+          const canSplitSub2api = splitDetails?.kind === "sub2api";
           if (elements.downloadSplit) {
-            elements.downloadSplit.hidden = !canSplitSub2api;
-            elements.downloadSplit.disabled = !canSplitSub2api;
-            elements.downloadSplit.textContent = canSplitSub2api
-              ? `拆分 ZIP（${state.sub2apiFiles.length}）`
+            elements.downloadSplit.hidden = !splitDetails;
+            elements.downloadSplit.disabled = !splitDetails;
+            elements.downloadSplit.textContent = splitDetails
+              ? `拆分 ZIP（${splitDetails.count}）`
               : "拆分 ZIP";
           }
 
@@ -1642,10 +1692,10 @@
             elements.cpaNotice.style.display = "none";
           } else {
             elements.statFormat.textContent = "CPA";
-            elements.outputSubtitle.textContent = state.downloadKind === "zip"
-              ? `当前输出为 CPA 预览清单；下载将打包 ${state.cpaFiles.length} 个 auth 文件。`
+            elements.outputSubtitle.textContent = splitDetails?.kind === "cpa"
+              ? `当前输出为包含 ${state.cpaFiles.length} 个账号的合并 JSON；也可选择「拆分 ZIP」导出原生 auth 文件。`
               : "当前输出为单个 CLIProxyAPI auth JSON。";
-            elements.downloadOutput.textContent = state.downloadKind === "zip" ? "下载 ZIP" : "下载 JSON";
+            elements.downloadOutput.textContent = "下载 JSON";
             elements.cpaNotice.style.display = "block";
           }
 
@@ -1653,7 +1703,7 @@
           renderIssues();
           renderLiveChecks();
 
-          if (outputText || (state.downloadKind === "zip" && state.cpaFiles.length)) {
+          if (outputText) {
             setStatus(elements.outputStatus, `已生成 ${state.converted.length} 个账号。`, "ok");
           } else {
             setStatus(elements.outputStatus, "暂无输出。", state.skipped.length ? "error" : "");
@@ -1770,13 +1820,6 @@
         }
 
         function downloadOutput() {
-          if (state.mode === "sub-to-cpa" && state.downloadKind === "zip" && state.cpaFiles.length) {
-            const zipBytes = bridge.buildZipFromCpaFiles(state.cpaFiles);
-            downloadBlob(new Blob([zipBytes], { type: "application/zip" }), state.downloadFileName || "cliproxyapi-auth-files.zip");
-            setStatus(elements.outputStatus, `已下载 ZIP（${state.cpaFiles.length} 个 auth 文件）。`, "ok");
-            return;
-          }
-
           if (!state.outputText) {
             return;
           }
@@ -1793,19 +1836,27 @@
           const base = sanitizeFileToken(first?.email || first?.name || state.format);
           const fileName = state.mode === "cpa-to-sub"
             ? (state.downloadFileName || `sub2api-import.${getTimestampToken()}.json`)
+            : state.mode === "sub-to-cpa"
+              ? (state.downloadFileName || `cliproxyapi-auth-list.${getTimestampToken()}.json`)
             : `${base}.${state.format}.${getTimestampToken()}.json`;
           downloadBlob(new Blob([state.outputText], { type: "application/json;charset=utf-8" }), fileName);
         }
 
-        function downloadSplitSub2apiZip() {
-          if (!canDownloadSub2apiSplitZip()) {
-            setStatus(elements.outputStatus, "当前没有可拆分的多个 sub2api 账号。", "error");
+        function downloadSplitZip() {
+          const details = splitExportDetails();
+          if (!details) {
+            setStatus(elements.outputStatus, "当前没有可拆分的多个账号。", "error");
             return;
           }
-          const zipBytes = bridge.buildZipFromSub2apiFiles(state.sub2apiFiles);
-          const fileName = `sub2api-accounts.split.${getTimestampToken()}.zip`;
+          const isCpa = details.kind === "cpa";
+          const zipBytes = isCpa
+            ? bridge.buildZipFromCpaFiles(state.cpaFiles)
+            : bridge.buildZipFromSub2apiFiles(state.sub2apiFiles);
+          const fileName = isCpa
+            ? `cliproxyapi-auth-files.split.${getTimestampToken()}.zip`
+            : `sub2api-accounts.split.${getTimestampToken()}.zip`;
           downloadBlob(new Blob([zipBytes], { type: "application/zip" }), fileName);
-          setStatus(elements.outputStatus, `已下载拆分 ZIP（${state.sub2apiFiles.length} 个 sub2api 导入文件）。`, "ok");
+          setStatus(elements.outputStatus, `已下载拆分 ZIP（${details.count} 个${isCpa ? " CPA auth" : " sub2api 导入"}文件）。`, "ok");
         }
 
         async function copyOutput() {
@@ -1959,7 +2010,8 @@
         elements.input.addEventListener("input", scheduleConvert);
         elements.copyOutput.addEventListener("click", copyOutput);
         elements.downloadOutput.addEventListener("click", downloadOutput);
-        elements.downloadSplit?.addEventListener("click", downloadSplitSub2apiZip);
+        elements.downloadSplit?.addEventListener("click", downloadSplitZip);
+        elements.upstreamCheckButton?.addEventListener("click", checkUpstreamUpdates);
         elements.liveCheckButton.addEventListener("click", runLiveCheck);
         elements.removeDeadButton.addEventListener("click", removeDeadAccountsFromOutput);
         elements.downloadCleanButton.addEventListener("click", downloadCleanOutput);
@@ -1992,11 +2044,13 @@
 
         document.addEventListener?.("click", (event) => {
           const link = event.target?.closest?.("a[href]");
-          if (!isDesktopRuntime || !link || !/^https:\/\//i.test(link.href) || !tauri?.opener?.openUrl) {
+          if (!isDesktopRuntime || !link || !/^https:\/\//i.test(link.href)) {
             return;
           }
           event.preventDefault();
-          tauri.opener.openUrl(link.href).catch(() => {});
+          tauri.core.invoke("open_external_url", { url: link.href }).catch((error) => {
+            setStatus(elements.outputStatus, `无法打开系统浏览器：${error instanceof Error ? error.message : String(error)}`, "error");
+          });
         });
 
         document.addEventListener?.("dragover", (event) => {

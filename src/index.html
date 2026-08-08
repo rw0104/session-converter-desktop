@@ -8,7 +8,7 @@
     <title>Session Converter · 凭证格式转换</title>
     <meta name="theme-color" content="#f5f5f7" />
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" sizes="any" />
-    <link rel="stylesheet" href="./styles.css?v=0.1.1" />
+    <link rel="stylesheet" href="./styles.css?v=0.1.2" />
   </head>
   <body>
     <main class="app">
@@ -36,11 +36,6 @@
           </div>
         </div>
         <aside class="resource-panel" aria-label="项目与账号服务">
-          <div class="runtime-summary">
-            <span class="runtime-mark" aria-hidden="true">SC</span>
-            <span class="runtime-copy"><small>轻量桌面内核</small><strong>系统 WebView + Rust</strong></span>
-            <span class="runtime-version">Tauri 2.11</span>
-          </div>
           <div class="resource-actions">
             <a class="resource-link" href="https://github.com/rw0104/session-converter-desktop" target="_blank" rel="noopener noreferrer">
               <span class="resource-icon" aria-hidden="true">
@@ -57,6 +52,32 @@
               <span class="resource-arrow" aria-hidden="true">↗</span>
             </a>
           </div>
+          <div class="upstream-check">
+            <div class="source-note-copy">
+              <strong>上游版本</strong>
+              <span id="upstream-check-status" role="status" aria-live="polite">转换规则对应固定审计提交。</span>
+            </div>
+            <button class="button button-secondary upstream-check-button" id="check-upstream-updates" type="button">检查更新</button>
+          </div>
+          <div class="source-versions" id="source-versions">
+            <!-- Filled by bridge.js SOURCE_PINS; static fallback for first paint -->
+            <a
+              class="source-version"
+              href="https://github.com/router-for-me/CLIProxyAPI/commit/197f520426374e514218ed155933ac546c98d345"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="打开 CLIProxyAPI 对应提交"
+              data-source-pin="cliproxyapi"
+            ><span>CLIProxyAPI · 197f5204</span></a>
+            <a
+              class="source-version"
+              href="https://github.com/Wei-Shaw/sub2api/commit/cc67b1aca1d3b590609abef2fcd3a6ca31c5c651"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="打开 sub2api 对应提交"
+              data-source-pin="sub2api"
+            ><span>sub2api · cc67b1ac</span></a>
+          </div>
         </aside>
         <div class="meta-row" aria-label="处理方式">
           <span class="meta-chip">桌面本地解析</span>
@@ -64,49 +85,6 @@
           <span class="meta-chip">检测由 Rust 直连</span>
           <span class="meta-chip">不写入存储</span>
         </div>
-        <aside class="source-note" aria-label="源码对照版本">
-          <div class="source-note-header">
-            <div class="source-note-copy">
-              <strong>已按审计版本源码映射</strong>
-              <span>转换规则对应固定上游提交，可追溯、可复核。</span>
-            </div>
-          </div>
-          <div class="source-versions" id="source-versions">
-            <!-- Filled by bridge.js SOURCE_PINS; static fallback for first paint -->
-            <a
-              class="source-version"
-              href="https://github.com/router-for-me/CLIProxyAPI/commit/42a00a2a6521b867c27f7ad096d08699db8e6d19"
-              target="_blank"
-              rel="noopener noreferrer"
-              title="打开 CLIProxyAPI 对应提交"
-              data-source-pin="cliproxyapi"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M6 3v12"></path>
-                <circle cx="18" cy="6" r="3"></circle>
-                <circle cx="6" cy="18" r="3"></circle>
-                <path d="M18 9a9 9 0 0 1-9 9"></path>
-              </svg>
-              <span>CLIProxyAPI · 42a00a2a</span>
-            </a>
-            <a
-              class="source-version"
-              href="https://github.com/Wei-Shaw/sub2api/commit/2730c1c43b29be003925b033f3f9e645e726bb8c"
-              target="_blank"
-              rel="noopener noreferrer"
-              title="打开 sub2api 对应提交"
-              data-source-pin="sub2api"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M6 3v12"></path>
-                <circle cx="18" cy="6" r="3"></circle>
-                <circle cx="6" cy="18" r="3"></circle>
-                <path d="M18 9a9 9 0 0 1-9 9"></path>
-              </svg>
-              <span>sub2api · 2730c1c4</span>
-            </a>
-          </div>
-        </aside>
       </header>
 
       <section class="toolbar" aria-label="输出控制">
@@ -152,18 +130,24 @@
           </div>
           <div class="panel-body">
             <div class="session-guide" id="session-guide">
-              <strong>Session 数据从这里获取</strong>
-              <p>
-                先在浏览器登录 ChatGPT，然后打开
-                <a href="https://chatgpt.com/api/auth/session" target="_blank" rel="noopener noreferrer">https://chatgpt.com/api/auth/session</a>
-                ，复制页面显示的整段 JSON，粘贴到下方输入框。
-              </p>
-              <p class="session-warning">OpenAI 已限制通过 Web session 转换导入来跳过 Codex OAuth add phone / 手机绑定验证；本页面仅用于格式转换。</p>
-              <p class="session-warning">这段 JSON 包含 accessToken 和 sessionToken，等同敏感登录凭证，不要发给别人。</p>
+              <div class="guide-heading">
+                <div>
+                  <span class="guide-eyebrow">Session source</span>
+                  <strong>获取当前登录凭证</strong>
+                </div>
+                <a class="guide-open" href="https://chatgpt.com/api/auth/session" target="_blank" rel="noopener noreferrer">
+                  在默认浏览器打开 <span aria-hidden="true">↗</span>
+                </a>
+              </div>
+              <p class="guide-step">先在浏览器登录 ChatGPT，再打开 Session 接口；复制页面显示的整段 JSON，粘贴到下方输入框。</p>
+              <div class="guide-notices">
+                <p class="guide-notice"><strong>兼容说明</strong><span>转换只处理现有凭证格式，不能替代官方 OAuth 或绕过账号验证。</span></p>
+                <p class="guide-notice guide-notice-sensitive"><strong>敏感数据</strong><span>JSON 至少含 <code>accessToken</code>，部分响应还含 <code>sessionToken</code>；不要发送给他人。</span></p>
+              </div>
             </div>
             <div class="session-guide" id="bridge-guide" hidden>
               <strong id="bridge-guide-title">CPA ↔ sub2api 双向转换</strong>
-              <p id="bridge-guide-body">支持 codex / claude / xai / antigravity。CPA 多账号导出时下载 ZIP，每个账号一个 auth JSON。</p>
+              <p id="bridge-guide-body">支持 codex / claude / xai / antigravity。多账号可下载合并 JSON，也可选择按账号拆分 ZIP。</p>
             </div>
             <input class="hidden" id="file-input" type="file" accept=".json,application/json" multiple />
             <div class="input-actions">
@@ -189,7 +173,7 @@
           </div>
           <div class="panel-body">
             <p class="notice" id="cpa-notice">
-              本页面仅做格式转换，不能绕过 Codex OAuth add phone / 手机绑定验证。ChatGPT Web session 一般没有 `refresh_token`；缺少真实 `id_token` 时 CPA、Cockpit、Codex 和 AxonHub 会构造 Codex 可解析的占位 JWT claims。Codex 和 Codex-Manager 会保留空 `refresh_token`；AxonHub 缺少真实 `refresh_token` 时会写入占位值。
+              本页面仅做格式转换，不能替代 Codex 官方登录、账号风险验证或 MFA。ChatGPT Web session 一般没有 `refresh_token`；缺少真实 `id_token` 时 CPA、Cockpit、Codex 和 AxonHub 会构造 Codex 可解析的占位 JWT claims。Codex 和 Codex-Manager 会保留空 `refresh_token`；AxonHub 缺少真实 `refresh_token` 时会写入占位值。
             </p>
             <div class="summary" aria-label="转换统计">
               <div class="stat">
@@ -285,7 +269,7 @@
       </footer>
     </main>
 
-    <script src="./bridge.js?v=0.1.1"></script>
-    <script src="./converter.js?v=0.1.1"></script>
+    <script src="./bridge.js?v=0.1.2"></script>
+    <script src="./converter.js?v=0.1.2"></script>
   </body>
 </html>

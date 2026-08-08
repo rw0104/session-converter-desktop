@@ -4,7 +4,6 @@
   "description": "Minimal permissions for the Session Converter main window",
   "windows": ["main"],
   "permissions": [
-    "core:default",
-    "opener:allow-open-url"
+    "core:default"
   ]
 }

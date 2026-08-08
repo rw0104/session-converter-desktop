@@ -27,12 +27,14 @@ Session Converter 是单窗口、小体量、无插件生态的桌面工具，�
 
 ## IPC 合约
 
-WebView 只调用两个 Rust 命令：
+WebView 只调用四个 Rust 命令：
 
 | 命令 | 输入 | 输出 | 权限边界 |
 | --- | --- | --- | --- |
 | `save_output_file` | 建议文件名、字节数组 | 用户选择的最终路径 | Rust 内核打开原生保存对话框；64 MiB 上限 |
 | `probe_chatgpt_workspace` | access token、可选空间 ID | 状态、阶段、错误码、模型 | 仅固定 `chatgpt.com/backend-api/codex` 地址 |
+| `check_upstream_updates` | 无 | 两个上游的固定提交比较结果 | 仅固定 GitHub 公共仓库；不接收 URL、仓库或分支参数 |
+| `open_external_url` | HTTPS URL | 成功或错误 | Rust 校验 `github.com`、`pay.ldxp.cn`、`chatgpt.com` 白名单后调用系统默认浏览器 |
 
 转换本身不跨 IPC；这样避免在每次字段转换时产生序列化和进程切换开销。
 
@@ -44,6 +46,8 @@ WebView 只调用两个 Rust 命令：
 4. 关闭/刷新窗口后内存状态丢失；应用不恢复凭证。
 
 可选健康检测是独立路径：仅在按钮点击后，把当前条目的 access token 交给 Rust；Rust 完成一次最小 Codex 请求后立即释放请求数据。
+
+上游更新检查同样只在用户点击后执行。它只读取两个公开仓库的 `main` 最新提交，与随应用发布的审计 SHA 比较；不会拉取源码、修改转换算法、下载二进制或自动升级应用。
 
 窗口尺寸与位置由官方 window-state 插件恢复；HTML5 文件拖放直接提供浏览器 `File` 对象，不额外开放任意路径读取命令。
 

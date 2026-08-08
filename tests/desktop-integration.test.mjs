@@ -13,9 +13,14 @@ test('desktop page is standalone and exposes intentional resource links', async 
   ]);
 
   assert.match(html, /Session Converter/);
-  assert.match(html, /系统 WebView \+ Rust/);
-  assert.match(html, /src="\.\/bridge\.js\?v=0\.1\.1"/);
-  assert.match(html, /src="\.\/converter\.js\?v=0\.1\.1"/);
+  assert.doesNotMatch(html, /系统 WebView \+ Rust|Tauri 2\.11|runtime-summary/);
+  assert.match(html, /src="\.\/bridge\.js\?v=0\.1\.2"/);
+  assert.match(html, /src="\.\/converter\.js\?v=0\.1\.2"/);
+  assert.match(html, /id="check-upstream-updates"/);
+  assert.match(html, /部分响应还含 <code>sessionToken<\/code>/);
+  assert.doesNotMatch(html, /JSON 包含 accessToken 和 sessionToken/);
+  assert.doesNotMatch(html, /add phone|手机绑定验证/);
+  assert.match(html, /账号风险验证或 MFA/);
   assert.match(html, /https:\/\/github\.com\/rw0104\/session-converter-desktop/);
   assert.match(html, /https:\/\/pay\.ldxp\.cn\/shop\/13QL6FLR/);
   assert.doesNotMatch(html, /项目主页|gpt-account-promo|返回兑换页|VaultKey · 凭证格式转换/);
@@ -33,6 +38,8 @@ test('conversion remains local and desktop-only capabilities are explicit', asyn
   ]);
 
   assert.match(converter, /probe_chatgpt_workspace/);
+  assert.match(converter, /check_upstream_updates/);
+  assert.match(converter, /open_external_url/);
   assert.match(converter, /save_output_file/);
   assert.doesNotMatch(converter, /tauri\.dialog\.save/);
   assert.doesNotMatch(converter, /localStorage|sessionStorage|indexedDB|document\.cookie|sendBeacon|WebSocket|XMLHttpRequest/i);
@@ -44,10 +51,7 @@ test('conversion remains local and desktop-only capabilities are explicit', asyn
   assert.match(parsedConfig.app.security.csp, /object-src 'none'/);
 
   const parsedCapability = JSON.parse(capability);
-  assert.deepEqual(parsedCapability.permissions, [
-    'core:default',
-    'opener:allow-open-url',
-  ]);
+  assert.deepEqual(parsedCapability.permissions, ['core:default']);
 });
 
 test('Rust health checks are pinned to Codex and never accept arbitrary URLs', async () => {
@@ -57,11 +61,29 @@ test('Rust health checks are pinned to Codex and never accept arbitrary URLs', a
   ]);
 
   assert.match(health, /https:\/\/chatgpt\.com\/backend-api\/codex/);
+  assert.match(health, /codex-tui\/0\.146\.0/);
+  assert.match(health, /responses=experimental/);
+  assert.match(health, /streamed_error_code/);
   assert.match(health, /probe_chatgpt_workspace\(access_token: String, account_id: String\)/);
   assert.doesNotMatch(health, /url:\s*String|endpoint:\s*String|reqwest::get/);
   assert.match(shell, /MAX_OUTPUT_BYTES: usize = 64 \* 1024 \* 1024/);
   assert.match(shell, /blocking_save_file/);
   assert.doesNotMatch(shell, /fn\s+write_output_file\s*\(path:/);
+});
+
+test('upstream and external-link commands only use fixed destinations', async () => {
+  const [upstream, shell] = await Promise.all([
+    read('src-tauri', 'src', 'upstream.rs'),
+    read('src-tauri', 'src', 'lib.rs'),
+  ]);
+
+  assert.match(upstream, /https:\/\/api\.github\.com\/repos/);
+  assert.match(upstream, /router-for-me\/CLIProxyAPI/);
+  assert.match(upstream, /Wei-Shaw\/sub2api/);
+  assert.match(upstream, /check_upstream_updates\(\)/);
+  assert.doesNotMatch(upstream, /check_upstream_updates\([^)]*(url|repository|branch)/);
+  assert.match(shell, /EXTERNAL_HOSTS: \[&str; 3\]/);
+  assert.match(shell, /open_external_url\(app: tauri::AppHandle, url: String\)/);
 });
 
 test('upstream schema pins and license provenance travel with the extraction', async () => {
@@ -71,8 +93,8 @@ test('upstream schema pins and license provenance travel with the extraction', a
     read('LICENSE'),
   ]);
 
-  assert.match(bridge, /42a00a2a6521b867c27f7ad096d08699db8e6d19/);
-  assert.match(bridge, /2730c1c43b29be003925b033f3f9e645e726bb8c/);
+  assert.match(bridge, /197f520426374e514218ed155933ac546c98d345/);
+  assert.match(bridge, /cc67b1aca1d3b590609abef2fcd3a6ca31c5c651/);
   assert.match(upstream, /gtxx3600\/GPTSession2CPAandSub2API/);
   assert.match(license, /MIT License/);
   assert.match(license, /Dehujiaogeli/);

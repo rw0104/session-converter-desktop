@@ -5,8 +5,10 @@ use std::time::Duration;
 use uuid::Uuid;
 
 const CHATGPT_CODEX_BASE_URL: &str = "https://chatgpt.com/backend-api/codex";
-const CODEX_CLIENT_VERSION: &str = "0.144.5";
-const CODEX_USER_AGENT: &str = "codex_cli_rs/0.144.5 (Mac OS 26.3.1; arm64) iTerm.app/3.6.9";
+const CODEX_CLIENT_VERSION: &str = "0.146.0";
+const CODEX_ORIGINATOR: &str = "codex-tui";
+const CODEX_USER_AGENT: &str = "codex-tui/0.146.0 (Ubuntu 22.4.0; x86_64) xterm-256color";
+const MAX_PROBE_RESPONSE_BYTES: usize = 256 * 1024;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -63,10 +65,32 @@ fn availability(status: u16) -> Option<bool> {
     }
 }
 
+fn availability_with_code(status: u16, code: &str) -> Option<bool> {
+    if !(200..300).contains(&status) {
+        return availability(status);
+    }
+    if code.is_empty() {
+        return Some(true);
+    }
+    match code {
+        "account_deactivated"
+        | "authentication_error"
+        | "billing_hard_limit_reached"
+        | "deactivated_workspace"
+        | "invalid_api_key"
+        | "subscription_inactive"
+        | "workspace_deactivated" => Some(false),
+        _ => None,
+    }
+}
+
 fn upstream_code(value: &Value) -> String {
     value
         .pointer("/detail/code")
         .or_else(|| value.pointer("/error/code"))
+        .or_else(|| value.pointer("/response/error/code"))
+        .or_else(|| value.pointer("/error/type"))
+        .or_else(|| value.pointer("/response/error/type"))
         .or_else(|| value.get("code"))
         .and_then(Value::as_str)
         .unwrap_or_default()
@@ -79,7 +103,8 @@ fn request_headers(access_token: &str, account_id: &str) -> Result<HeaderMap, St
     let mut headers = HeaderMap::new();
     headers.insert(ACCEPT, HeaderValue::from_static("application/json"));
     headers.insert(USER_AGENT, HeaderValue::from_static(CODEX_USER_AGENT));
-    headers.insert("originator", HeaderValue::from_static("codex_cli_rs"));
+    headers.insert("originator", HeaderValue::from_static(CODEX_ORIGINATOR));
+    headers.insert("version", HeaderValue::from_static(CODEX_CLIENT_VERSION));
     headers.insert(
         AUTHORIZATION,
         HeaderValue::from_str(&format!("Bearer {access_token}"))
@@ -95,12 +120,57 @@ fn request_headers(access_token: &str, account_id: &str) -> Result<HeaderMap, St
     Ok(headers)
 }
 
-async fn error_code(response: reqwest::Response) -> String {
-    response
-        .json::<Value>()
-        .await
-        .map(|value| upstream_code(&value))
-        .unwrap_or_default()
+fn streamed_error_code(body: &[u8]) -> String {
+    if let Ok(value) = serde_json::from_slice::<Value>(body) {
+        let code = upstream_code(&value);
+        if !code.is_empty() {
+            return code;
+        }
+    }
+    for line in String::from_utf8_lossy(body).lines() {
+        let Some(payload) = line.trim().strip_prefix("data:") else {
+            continue;
+        };
+        let payload = payload.trim();
+        if payload.is_empty() || payload == "[DONE]" {
+            continue;
+        }
+        let Ok(value) = serde_json::from_str::<Value>(payload) else {
+            continue;
+        };
+        let code = upstream_code(&value);
+        if !code.is_empty() {
+            return code;
+        }
+        if matches!(
+            value.get("type").and_then(Value::as_str),
+            Some("error" | "response.failed")
+        ) {
+            return "response_failed".to_string();
+        }
+    }
+    String::new()
+}
+
+async fn error_code(mut response: reqwest::Response) -> String {
+    let mut body = Vec::new();
+    loop {
+        let Ok(chunk) = response.chunk().await else {
+            break;
+        };
+        let Some(chunk) = chunk else {
+            break;
+        };
+        let remaining = MAX_PROBE_RESPONSE_BYTES.saturating_sub(body.len());
+        if remaining == 0 {
+            break;
+        }
+        body.extend_from_slice(&chunk[..chunk.len().min(remaining)]);
+        if body.len() >= MAX_PROBE_RESPONSE_BYTES {
+            break;
+        }
+    }
+    streamed_error_code(&body)
 }
 
 #[tauri::command]
@@ -201,6 +271,10 @@ pub async fn probe_chatgpt_workspace(access_token: String, account_id: String) -
     let mut response_headers = headers;
     response_headers.insert(ACCEPT, HeaderValue::from_static("text/event-stream"));
     response_headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+    response_headers.insert(
+        "openai-beta",
+        HeaderValue::from_static("responses=experimental"),
+    );
     if let Ok(session_id) = HeaderValue::from_str(&Uuid::new_v4().to_string()) {
         response_headers.insert("session_id", session_id);
     }
@@ -222,15 +296,11 @@ pub async fn probe_chatgpt_workspace(access_token: String, account_id: String) -
         }
     };
     let response_status = model_response.status().as_u16();
-    let code = if model_response.status().is_success() {
-        String::new()
-    } else {
-        error_code(model_response).await
-    };
+    let code = error_code(model_response).await;
 
     ProbeResult {
         status: response_status,
-        available: availability(response_status),
+        available: availability_with_code(response_status, &code),
         stage: "response",
         code,
         model: Some(model),
@@ -258,11 +328,19 @@ mod tests {
         assert_eq!(availability(403), Some(false));
         assert_eq!(availability(429), None);
         assert_eq!(availability(503), None);
+        assert_eq!(availability_with_code(200, ""), Some(true));
+        assert_eq!(
+            availability_with_code(200, "deactivated_workspace"),
+            Some(false)
+        );
+        assert_eq!(availability_with_code(200, "server_is_overloaded"), None);
     }
 
     #[test]
     fn extracts_bounded_upstream_error_codes() {
         let payload = json!({ "detail": { "code": "deactivated_workspace" } });
         assert_eq!(upstream_code(&payload), "deactivated_workspace");
+        let sse = b"event: response.failed\ndata: {\"type\":\"response.failed\",\"response\":{\"error\":{\"code\":\"server_is_overloaded\"}}}\n\n";
+        assert_eq!(streamed_error_code(sse), "server_is_overloaded");
     }
 }

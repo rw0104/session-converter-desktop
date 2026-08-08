@@ -7,16 +7,18 @@
 - ChatGPT Session → sub2api、CPA、Cockpit、9router、Codex、AxonHub、Codex-Manager
 - CPA → sub2api
 - sub2api → CPA
-- 多账号 JSON 导入、文件拖放、自动格式识别、拆分 ZIP、复制与原生保存
+- 多账号 JSON 导入、文件拖放、自动格式识别、合并 JSON、可选拆分 ZIP、复制与原生保存
 - sub2api Agent Identity 凭证识别与 Ed25519 PKCS#8 结构校验
 - 可选的 Codex 真实模型检测；仅在用户主动点击后执行
+- 两个固定上游的一键只读更新检查，不下载或执行远端代码
+- 项目、采购和 Session 获取链接通过系统默认浏览器打开
 
 转换算法在 WebView 内存中运行，不调用网络，也不使用 `localStorage`、Cookie、IndexedDB 或数据库。可选模型检测由 Rust 内核直接请求 OpenAI Codex；access token 不写入磁盘或日志。
 
 ## 技术栈
 
 - [Tauri 2.11](https://v2.tauri.app/)：原生窗口、系统 WebView 与跨平台打包
-- Rust：原生保存、严格范围的 Codex 健康检测
+- Rust：原生保存、系统默认浏览器、固定上游检查、严格范围的 Codex 健康检测
 - Vanilla JavaScript：转换核心和界面，无前端运行时依赖
 - Node.js：只用于开发脚本与算法测试，不随应用分发
 
@@ -48,6 +50,8 @@ npm run build
 - Rust 写文件命令限制单次输出最大 64 MiB。
 - WebView CSP 禁止任意网络连接、内联脚本、对象、frame 和表单提交。
 - WebView 不直接持有网络权限；可选检测只能调用固定的 Rust 命令和固定的 OpenAI Codex 地址。
+- 外部链接由 Rust 执行 HTTPS 与主机白名单校验；WebView 不能直接调用 opener 插件。
+- 上游更新检查不接收任意 URL，只访问 CLIProxyAPI 与 sub2api 的固定 GitHub API 地址。
 - 只有确认的本地过期或 HTTP 401/402/403 会进入可清理集合；429、5xx、超时和网络故障不会误删。
 
 详见 [架构说明](docs/ARCHITECTURE.md) 与 [提取记录](docs/EXTRACTION.md)。

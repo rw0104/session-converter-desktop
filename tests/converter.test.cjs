@@ -75,6 +75,10 @@ function loadPageScript(overrides = {}) {
 
   const document = {
     body: createFakeElement("body"),
+    listeners: {},
+    addEventListener(type, handler) {
+      this.listeners[type] = handler;
+    },
     createElement(selector) {
       return createFakeElement(selector);
     },
@@ -133,6 +137,7 @@ function loadPageScript(overrides = {}) {
     },
     parseInt: Number.parseInt,
     setTimeout: overrides.setTimeout || setTimeout,
+    __TAURI__: overrides.tauri,
     globalThis: {},
   };
   context.globalThis = context;
@@ -141,6 +146,50 @@ function loadPageScript(overrides = {}) {
   vm.runInNewContext(script, context, { filename: "public/tools/session-converter/converter.js" });
 
   return { elements, formatButtons, modeButtons, context };
+}
+
+async function testDesktopExternalLinksUseRustAllowlistedCommand() {
+  const calls = [];
+  const { context } = loadPageScript({
+    tauri: {
+      core: {
+        async invoke(command, args) {
+          calls.push({ command, args });
+          return null;
+        },
+      },
+    },
+  });
+  let prevented = false;
+  const link = { href: "https://pay.ldxp.cn/shop/13QL6FLR" };
+  context.document.listeners.click({
+    target: { closest: () => link },
+    preventDefault() { prevented = true; },
+  });
+  await Promise.resolve();
+  assert.equal(prevented, true);
+  assert.equal(calls[0].command, "open_external_url");
+  assert.equal(calls[0].args.url, "https://pay.ldxp.cn/shop/13QL6FLR");
+}
+
+async function testDesktopUpstreamCheckReportsAuditedPins() {
+  const { elements } = loadPageScript({
+    tauri: {
+      core: {
+        async invoke(command) {
+          assert.equal(command, "check_upstream_updates");
+          return [
+            { label: "CLIProxyAPI", status: "current" },
+            { label: "sub2api", status: "current" },
+          ];
+        },
+      },
+    },
+  });
+  await dispatchAsync(elements.get("#check-upstream-updates"), "click");
+  assert.equal(elements.get("#check-upstream-updates").disabled, false);
+  assert.equal(elements.get("#check-upstream-updates").textContent, "检查更新");
+  assert.match(elements.get("#upstream-check-status").textContent, /均与当前审计提交一致/);
 }
 
 function dispatch(element, type) {
@@ -205,6 +254,29 @@ function testSub2apiAccountUsesAccessTokenExpiry() {
   assert.equal(account.credentials.expires_at, new Date(1780473960 * 1000).toISOString());
   assert.equal(account.credentials.client_id, undefined);
   assert.equal(account.credentials.id_token.split(".").length, 3);
+}
+
+function testCurrentChatGptSessionWorksWithoutSessionToken() {
+  const { elements } = loadPageScript();
+  const input = elements.get("#session-input");
+  const output = elements.get("#output");
+
+  input.value = JSON.stringify({
+    user: { id: "user-current", email: "current@example.com" },
+    expires: "2099-01-01T00:00:00.000Z",
+    account: { id: "account-current", planType: "plus" },
+    accessToken: jwtWithPayload({ exp: 1780473960 }),
+    authProvider: "openai",
+  });
+  dispatch(input, "input");
+
+  const account = JSON.parse(output.value).accounts[0];
+  assert.equal(account.credentials.chatgpt_account_id, "account-current");
+  assert.equal(account.credentials.chatgpt_user_id, "user-current");
+  assert.equal(account.credentials.plan_type, "plus");
+  assert.equal(account.credentials.expires_at, new Date(1780473960 * 1000).toISOString());
+  assert.equal(account.extra.session_expires_at, "2099-01-01T00:00:00.000Z");
+  assert.equal(account.extra.session_token_present, undefined);
 }
 
 function testSub2apiAccountsUseTheirOwnAccessTokenExpiry() {
@@ -752,7 +824,7 @@ function testCpaToSub2apiBridgeSupportsMultiProvider() {
   assert.equal(document.accounts[3].credentials.project_id, "agproj");
 }
 
-function testSub2apiToCpaBridgeBuildsAuthListAndZipBytes() {
+function testSub2apiToCpaBridgeOffersMergedJsonAndSplitZip() {
   const { elements, modeButtons, context } = loadPageScript();
   const modeButton = modeButtons.find((button) => button.dataset.mode === "sub-to-cpa");
   const input = elements.get("#session-input");
@@ -799,7 +871,12 @@ function testSub2apiToCpaBridgeBuildsAuthListAndZipBytes() {
   assert.equal(document.auths[0].type, "codex");
   assert.equal(document.auths[0].account_id, "acc-1");
   assert.equal(document.auths[1].type, "claude");
-  assert.equal(elements.get("#download-output").textContent, "下载 ZIP");
+  assert.match(document.note, /合并 JSON/);
+  assert.equal(elements.get("#download-output").textContent, "下载 JSON");
+  assert.equal(elements.get("#download-split").hidden, false);
+  assert.equal(elements.get("#download-split").disabled, false);
+  assert.match(elements.get("#download-split").textContent, /拆分 ZIP（2）/);
+  assert.match(elements.get("#output-subtitle").textContent, /合并 JSON/);
 
   const zip = context.VaultKeySessionBridge.buildZipFromCpaFiles([
     { name: "codex-alpha.json", data: document.auths[0] },
@@ -918,19 +995,19 @@ function testSourcePinsMatchHeaderBadges() {
   assert.equal(pins.length, 2);
   assert.equal(pins[0].label, "CLIProxyAPI");
   assert.equal(pins[0].branch, "main");
-  assert.equal(pins[0].shortSha, "42a00a2a");
-  assert.equal(pins[0].date, "2026-07-26");
-  assert.match(pins[0].commitUrl, /42a00a2a6521b867c27f7ad096d08699db8e6d19/);
+  assert.equal(pins[0].shortSha, "197f5204");
+  assert.equal(pins[0].date, "2026-08-08");
+  assert.match(pins[0].commitUrl, /197f520426374e514218ed155933ac546c98d345/);
   assert.equal(pins[1].label, "sub2api");
-  assert.equal(pins[1].shortSha, "2730c1c4");
-  assert.equal(pins[1].date, "2026-07-25");
+  assert.equal(pins[1].shortSha, "cc67b1ac");
+  assert.equal(pins[1].date, "2026-08-08");
   assert.equal(
     context.VaultKeySessionBridge.formatSourcePinLabel(pins[0]),
-    "CLIProxyAPI · 42a00a2a",
+    "CLIProxyAPI · 197f5204",
   );
   assert.equal(
     context.VaultKeySessionBridge.formatSourcePinLabel(pins[1]),
-    "sub2api · 2730c1c4",
+    "sub2api · cc67b1ac",
   );
 }
 
@@ -1148,7 +1225,10 @@ function testSub2apiAgentIdentityAccountCannotConvertToCpa() {
 }
 
 async function main() {
+  await testDesktopExternalLinksUseRustAllowlistedCommand();
+  await testDesktopUpstreamCheckReportsAuditedPins();
   testSub2apiAccountUsesAccessTokenExpiry();
+  testCurrentChatGptSessionWorksWithoutSessionToken();
   testSub2apiAccountsUseTheirOwnAccessTokenExpiry();
   testSub2apiAccountWithRefreshTokenKeepsTokenExpiryAndClientId();
   testCpaOutputMatchesCodexTokenStorageCore();
@@ -1160,7 +1240,7 @@ async function main() {
   testCodexManagerAuthJsonUsesEmptyRefreshTokenWhenMissing();
   testCodexManagerAuthJsonPreservesRealRefreshAndMetadata();
   testCpaToSub2apiBridgeSupportsMultiProvider();
-  testSub2apiToCpaBridgeBuildsAuthListAndZipBytes();
+  testSub2apiToCpaBridgeOffersMergedJsonAndSplitZip();
   testDetectInputModeForBridgeFormats();
   testAutoDetectSwitchesModeOnPaste();
   testSub2apiSplitZipBuildsMultipleFiles();
