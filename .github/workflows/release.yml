@@ -15,11 +15,11 @@ jobs:
       matrix:
         include:
           - platform: macos-14
-            args: --target aarch64-apple-darwin
+            args: --target aarch64-apple-darwin --bundles app
             target: aarch64-apple-darwin
-          - platform: macos-13
-            args: --target x86_64-apple-darwin
-            target: x86_64-apple-darwin
+          - platform: macos-15-intel
+            args: --bundles app
+            target: ""
           - platform: ubuntu-24.04
             args: ""
             target: ""
