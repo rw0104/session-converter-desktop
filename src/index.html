@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="在桌面本地完成 ChatGPT Session、CPA、sub2api、Codex 等凭证格式转换。" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Session Converter · 凭证格式转换</title>
+    <meta name="theme-color" content="#f5f5f7" />
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" sizes="any" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <nav class="vaultkey-nav" aria-label="Session Converter 应用栏">
+        <div class="vaultkey-brand">
+          <span class="vaultkey-mark" aria-hidden="true"><i></i><i></i></span>
+          <span>Session Converter</span>
+        </div>
+        <div class="vaultkey-nav-copy"><strong>桌面版</strong><span>转换全程留在本机；检测仅在主动点击后直连 OpenAI</span></div>
+        <a class="back-link" href="https://github.com/rw0104" target="_blank" rel="noopener noreferrer">项目主页 <span aria-hidden="true">↗</span></a>
+      </nav>
+      <header class="topbar">
+        <div class="title-block">
+          <p class="eyebrow">Local Credential Converter</p>
+          <h1>登录凭证格式转换</h1>
+          <p class="title-description">粘贴或导入已有 JSON，在本机转换为目标工具支持的格式。凭证不会上传到任何转换服务器。</p>
+          <div class="title-targets" aria-label="支持输出格式">
+            <span>CPA</span>
+            <span>sub2api</span>
+            <span>Cockpit</span>
+            <span>9router</span>
+            <span>Codex</span>
+            <span>AxonHub</span>
+            <span>Codex-Manager</span>
+          </div>
+        </div>
+        <div class="gpt-account-promo desktop-edition" aria-label="轻量桌面运行时">
+          <span class="gpt-account-promo-badge" aria-hidden="true">DESKTOP</span>
+          <span class="gpt-account-promo-copy">
+            <span>轻量原生外壳</span>
+            <strong>系统 WebView · Rust 内核</strong>
+            <small>不捆绑 Chromium，不常驻 Node 后台</small>
+          </span>
+          <span class="gpt-account-promo-action">Tauri 2.11</span>
+        </div>
+        <div class="meta-row" aria-label="处理方式">
+          <span class="meta-chip">桌面本地解析</span>
+          <span class="meta-chip">转换不上传 token</span>
+          <span class="meta-chip">检测由 Rust 直连</span>
+          <span class="meta-chip">不写入存储</span>
+          <a
+            class="meta-chip github-link"
+            href="https://github.com/gtxx3600/GPTSession2CPAandSub2API"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="查看上游开源项目"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.44 9.8 8.21 11.39.6.11.82-.26.82-.58v-2.24c-3.34.73-4.04-1.42-4.04-1.42-.55-1.39-1.34-1.76-1.34-1.76-1.09-.75.08-.73.08-.73 1.21.08 1.85 1.24 1.85 1.24 1.07 1.84 2.81 1.31 3.5 1 .11-.78.42-1.31.76-1.61-2.66-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.12-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.23A11.5 11.5 0 0 1 12 5.78c1.02 0 2.05.14 3.01.41 2.29-1.55 3.3-1.23 3.3-1.23.66 1.66.24 2.88.12 3.18.77.84 1.24 1.91 1.24 3.22 0 4.61-2.81 5.63-5.49 5.93.43.37.82 1.1.82 2.22v3.3c0 .32.22.7.83.58A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12Z" />
+            </svg>
+            <span>上游开源项目</span>
+          </a>
+        </div>
+        <aside class="source-note" aria-label="源码对照版本">
+          <div class="source-note-header">
+            <div class="source-note-copy">
+              <strong>已按审计版本源码映射</strong>
+              <span>账户字段算法钉死在下列上游提交；两仓更新后只 diff 对应 commit 再改 <code>bridge.js</code> 的 <code>SOURCE_PINS</code>。</span>
+            </div>
+          </div>
+          <div class="source-versions" id="source-versions">
+            <!-- Filled by bridge.js SOURCE_PINS; static fallback for first paint -->
+            <a
+              class="source-version"
+              href="https://github.com/router-for-me/CLIProxyAPI/commit/42a00a2a6521b867c27f7ad096d08699db8e6d19"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="打开 CLIProxyAPI 对应提交"
+              data-source-pin="cliproxyapi"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M6 3v12"></path>
+                <circle cx="18" cy="6" r="3"></circle>
+                <circle cx="6" cy="18" r="3"></circle>
+                <path d="M18 9a9 9 0 0 1-9 9"></path>
+              </svg>
+              <span>CLIProxyAPI main: 42a00a2a, 2026-07-26</span>
+            </a>
+            <a
+              class="source-version"
+              href="https://github.com/Wei-Shaw/sub2api/commit/2730c1c43b29be003925b033f3f9e645e726bb8c"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="打开 sub2api 对应提交"
+              data-source-pin="sub2api"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M6 3v12"></path>
+                <circle cx="18" cy="6" r="3"></circle>
+                <circle cx="6" cy="18" r="3"></circle>
+                <path d="M18 9a9 9 0 0 1-9 9"></path>
+              </svg>
+              <span>sub2api main: 2730c1c4, 2026-07-25</span>
+            </a>
+          </div>
+        </aside>
+      </header>
+
+      <section class="toolbar" aria-label="输出控制">
+        <div class="mode-row">
+          <div class="segmented mode-segmented" role="group" aria-label="转换模式">
+            <button type="button" data-mode="session" aria-pressed="true">Session → 多格式</button>
+            <button type="button" data-mode="cpa-to-sub" aria-pressed="false">CPA → sub2api</button>
+            <button type="button" data-mode="sub-to-cpa" aria-pressed="false">sub2api → CPA</button>
+          </div>
+          <div class="mode-meta">
+            <p class="mode-hint" id="mode-hint">粘贴 ChatGPT session，导出为 CPA / sub2api 等目标格式。</p>
+            <label class="auto-detect" for="auto-detect-mode">
+              <input id="auto-detect-mode" type="checkbox" checked />
+              <span>自动识别输入并切换模式</span>
+            </label>
+          </div>
+        </div>
+        <div class="toolbar-bottom">
+          <div class="segmented format-segmented" role="group" aria-label="输出格式" id="format-group">
+            <button type="button" data-format="sub2api" aria-pressed="true">sub2api</button>
+            <button type="button" data-format="cpa" aria-pressed="false">CPA</button>
+            <button type="button" data-format="cockpit" aria-pressed="false">Cockpit</button>
+            <button type="button" data-format="9router" aria-pressed="false">9router</button>
+            <button type="button" data-format="codex" aria-pressed="false">Codex</button>
+            <button type="button" data-format="axonhub" aria-pressed="false">AxonHub</button>
+            <button type="button" data-format="codexmanager" aria-pressed="false">Codex-Manager</button>
+          </div>
+          <div class="actions">
+            <button class="button button-secondary" id="copy-output" type="button" disabled>复制输出</button>
+            <button class="button button-secondary" id="download-split" type="button" disabled hidden>拆分 ZIP</button>
+            <button class="button button-primary" id="download-output" type="button" disabled>下载 JSON</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="workspace">
+        <section class="panel" aria-labelledby="input-title">
+          <div class="panel-head">
+            <div>
+              <h2 id="input-title">Session JSON</h2>
+              <p id="input-hint">粘贴 ChatGPT Web session，或拖入一个或多个 JSON 文件。</p>
+            </div>
+          </div>
+          <div class="panel-body">
+            <div class="session-guide" id="session-guide">
+              <strong>Session 数据从这里获取</strong>
+              <p>
+                先在浏览器登录 ChatGPT，然后打开
+                <a href="https://chatgpt.com/api/auth/session" target="_blank" rel="noopener noreferrer">https://chatgpt.com/api/auth/session</a>
+                ，复制页面显示的整段 JSON，粘贴到下方输入框。
+              </p>
+              <p class="session-warning">OpenAI 已限制通过 Web session 转换导入来跳过 Codex OAuth add phone / 手机绑定验证；本页面仅用于格式转换。</p>
+              <p class="session-warning">这段 JSON 包含 accessToken 和 sessionToken，等同敏感登录凭证，不要发给别人。</p>
+            </div>
+            <div class="session-guide" id="bridge-guide" hidden>
+              <strong id="bridge-guide-title">CPA ↔ sub2api 双向转换</strong>
+              <p id="bridge-guide-body">支持 codex / claude / xai / antigravity。CPA 多账号导出时下载 ZIP，每个账号一个 auth JSON。</p>
+            </div>
+            <input class="hidden" id="file-input" type="file" accept=".json,application/json" multiple />
+            <div class="input-actions">
+              <button class="button button-secondary" id="pick-files" type="button">选择文件</button>
+              <button class="button button-secondary" id="load-example" type="button">填入示例结构</button>
+              <button class="button button-ghost" id="clear-input" type="button">清空</button>
+            </div>
+            <textarea
+              id="session-input"
+              spellcheck="false"
+              placeholder='{"user":{"email":"mark@example.com"},"expires":"2026-08-06T14:29:36.155Z","account":{"id":"...","planType":"plus"},"accessToken":"...","sessionToken":"..."}'
+            ></textarea>
+            <div class="status-line" id="input-status">等待输入。</div>
+          </div>
+        </section>
+
+        <section class="panel" aria-labelledby="output-title">
+          <div class="panel-head">
+            <div>
+              <h2 id="output-title">转换结果</h2>
+              <p id="output-subtitle">当前输出为 sub2api 导入 JSON。</p>
+            </div>
+          </div>
+          <div class="panel-body">
+            <p class="notice" id="cpa-notice">
+              本页面仅做格式转换，不能绕过 Codex OAuth add phone / 手机绑定验证。ChatGPT Web session 一般没有 `refresh_token`；缺少真实 `id_token` 时 CPA、Cockpit、Codex 和 AxonHub 会构造 Codex 可解析的占位 JWT claims。Codex 和 Codex-Manager 会保留空 `refresh_token`；AxonHub 缺少真实 `refresh_token` 时会写入占位值。
+            </p>
+            <div class="summary" aria-label="转换统计">
+              <div class="stat">
+                <div class="stat-value" id="stat-count">0</div>
+                <div class="stat-label">账号数</div>
+              </div>
+              <div class="stat">
+                <div class="stat-value" id="stat-format">sub2api</div>
+                <div class="stat-label">输出格式</div>
+              </div>
+              <div class="stat">
+                <div class="stat-value" id="stat-errors">0</div>
+                <div class="stat-label">跳过项</div>
+              </div>
+            </div>
+            <section class="live-check" aria-labelledby="live-check-title">
+              <div class="live-check-heading">
+                <div>
+                  <p class="live-check-eyebrow">Optional verification</p>
+                  <h3 id="live-check-title">实际模型检测与清理</h3>
+                </div>
+                <span class="live-check-privacy">仅在点击后请求</span>
+              </div>
+              <div class="live-check-bar">
+                <button class="button button-primary live-check-main" id="live-check-button" type="button" disabled>开始检测</button>
+                <label class="live-check-control" for="live-check-concurrency">
+                  <span>并发</span>
+                  <input id="live-check-concurrency" type="number" min="1" max="20" step="1" value="5" inputmode="numeric" />
+                </label>
+                <div class="live-check-actions">
+                  <button class="button button-secondary" id="remove-dead-button" type="button" disabled>删除不可用 / 过期账号</button>
+                  <button class="button button-secondary" id="download-clean-button" type="button" disabled>下载清理后 JSON</button>
+                </div>
+              </div>
+              <p class="live-check-note">
+                检测由桌面端 Rust 内核直接向 OpenAI Codex 发起一次最小真实模型请求，并在记录包含空间 ID 时发送 <code>ChatGPT-Account-Id</code>。access token 仅存在于本次请求内存，不写入磁盘或日志；检测会产生极少量模型用量。JWT 过期及 HTTP 401、402、403 可清理；429、5xx、超时与网络错误标为未知，不会误删。
+              </p>
+              <div class="live-check-table">
+                <table>
+                  <colgroup>
+                    <col class="col-email" />
+                    <col class="col-expiry" />
+                    <col class="col-health" />
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <th>邮箱</th>
+                      <th>过期时间</th>
+                      <th>检测结果</th>
+                    </tr>
+                  </thead>
+                  <tbody id="live-check-body">
+                    <tr>
+                      <td colspan="3" class="empty">暂无可测账号。</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="status-line" id="live-check-status" aria-live="polite">等待可测账号。</div>
+            </section>
+            <div class="accounts" aria-label="账号预览">
+              <table>
+                <colgroup>
+                  <col class="col-name" />
+                  <col class="col-email" />
+                  <col class="col-expiry" />
+                  <col class="col-type" />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th>名称</th>
+                    <th>邮箱</th>
+                    <th>过期时间</th>
+                    <th>来源</th>
+                  </tr>
+                </thead>
+                <tbody id="account-body">
+                  <tr>
+                    <td colspan="4" class="empty">暂无可转换账号。</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="issues" id="issues"></div>
+            <textarea id="output" readonly spellcheck="false" placeholder="转换后会显示 JSON。"></textarea>
+            <div class="status-line" id="output-status">暂无输出。</div>
+          </div>
+        </section>
+      </section>
+      <footer class="tool-footer">
+        <span>格式转换不会上传或持久化输入；只有主动点击“开始检测”时，access token 才会由本机 Rust 内核发送到 OpenAI Codex，完成后立即丢弃。</span>
+        <span>基于 MIT 开源项目 <a href="https://github.com/gtxx3600/GPTSession2CPAandSub2API" target="_blank" rel="noopener noreferrer">GPTSession2CPAandSub2API</a> 整合。</span>
+      </footer>
+    </main>
+
+    <script src="./bridge.js"></script>
+    <script src="./converter.js"></script>
+  </body>
+</html>

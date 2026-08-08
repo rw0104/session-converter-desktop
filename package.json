@@ -1,0 +1,21 @@
+{
+  "name": "session-converter-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A local-first desktop credential format converter for CPA, sub2api, Codex and related formats.",
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "test:core": "node tests/converter.test.cjs && node --test tests/desktop-integration.test.mjs",
+    "test:rust": "cargo test --workspace",
+    "test": "npm run test:core && npm run test:rust",
+    "check": "node --check src/bridge.js && node --check src/converter.js && cargo check --workspace",
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.11.4"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
