@@ -1,0 +1,39 @@
+name: Audit upstream algorithm files
+
+on:
+  schedule:
+    - cron: "23 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: upstream-algorithm-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Compare audited file blobs with upstream
+        id: audit
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/check-upstreams.mjs --write --github
+      - name: Commit metadata-only audit refresh
+        if: steps.audit.outputs.metadata_changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add config/upstream-audit.json src/bridge.js
+          git diff --cached --quiet && exit 0
+          git commit -m "chore: refresh upstream audit metadata"
+          git push origin HEAD:main

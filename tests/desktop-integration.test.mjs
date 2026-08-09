@@ -14,9 +14,13 @@ test('desktop page is standalone and exposes intentional resource links', async 
 
   assert.match(html, /Session Converter/);
   assert.doesNotMatch(html, /系统 WebView \+ Rust|Tauri 2\.11|runtime-summary/);
-  assert.match(html, /src="\.\/bridge\.js\?v=0\.1\.3"/);
-  assert.match(html, /src="\.\/converter\.js\?v=0\.1\.3"/);
+  assert.match(html, /src="\.\/bridge\.js\?v=0\.1\.4"/);
+  assert.match(html, /src="\.\/converter\.js\?v=0\.1\.4"/);
+  assert.match(html, /id="check-app-update"/);
   assert.match(html, /id="check-upstream-updates"/);
+  assert.match(html, /id="live-check-model"/);
+  assert.match(html, /sol（默认）/);
+  assert.match(html, /自动匹配（Free 推荐）/);
   assert.match(html, /id="file-drop-zone"/);
   assert.match(html, /拖入 JSON 即可转换/);
   assert.match(html, /部分响应还含 <code>sessionToken<\/code>/);
@@ -73,7 +77,8 @@ test('Rust health checks are pinned to Codex and never accept arbitrary URLs', a
   assert.match(health, /codex-tui\/0\.146\.0/);
   assert.match(health, /responses=experimental/);
   assert.match(health, /streamed_error_code/);
-  assert.match(health, /probe_chatgpt_workspace\(access_token: String, account_id: String\)/);
+  assert.match(health, /requested_model: String/);
+  assert.match(health, /requested_model_unavailable/);
   assert.doesNotMatch(health, /url:\s*String|endpoint:\s*String|reqwest::get/);
   assert.match(shell, /MAX_OUTPUT_BYTES: usize = 64 \* 1024 \* 1024/);
   assert.match(shell, /blocking_save_file/);
@@ -91,6 +96,8 @@ test('upstream and external-link commands only use fixed destinations', async ()
   assert.match(upstream, /router-for-me\/CLIProxyAPI/);
   assert.match(upstream, /Wei-Shaw\/sub2api/);
   assert.match(upstream, /check_upstream_updates\(\)/);
+  assert.match(upstream, /git\/trees/);
+  assert.match(upstream, /pinned_blob_sha/);
   assert.doesNotMatch(upstream, /check_upstream_updates\([^)]*(url|repository|branch)/);
   assert.match(shell, /EXTERNAL_HOSTS: \[&str; 3\]/);
   assert.match(shell, /open_external_url\(app: tauri::AppHandle, url: String\)/);
@@ -106,7 +113,7 @@ test('upstream schema pins and license provenance travel with the extraction', a
     read('LICENSE'),
   ]);
 
-  assert.match(bridge, /197f520426374e514218ed155933ac546c98d345/);
+  assert.match(bridge, /2e6b1d83f6c304a102aa33c1faf0a4f94d0d331e/);
   assert.match(bridge, /cc67b1aca1d3b590609abef2fcd3a6ca31c5c651/);
   assert.match(upstream, /gtxx3600\/GPTSession2CPAandSub2API/);
   assert.match(license, /MIT License/);

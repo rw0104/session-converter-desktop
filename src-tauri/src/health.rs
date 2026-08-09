@@ -18,6 +18,7 @@ pub struct ProbeResult {
     pub stage: &'static str,
     pub code: String,
     pub model: Option<String>,
+    pub available_models: Vec<String>,
 }
 
 impl ProbeResult {
@@ -28,6 +29,7 @@ impl ProbeResult {
             stage: "local",
             code: code.to_string(),
             model: None,
+            available_models: Vec::new(),
         }
     }
 
@@ -38,6 +40,7 @@ impl ProbeResult {
             stage: "network",
             code: code.to_string(),
             model: None,
+            available_models: Vec::new(),
         }
     }
 }
@@ -55,6 +58,51 @@ fn valid_account_id(value: &str) -> bool {
             .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-')
 }
 
+fn valid_model_slug(value: &str) -> bool {
+    let model = value.trim();
+    (1..=128).contains(&model.len())
+        && model.bytes().all(|byte| {
+            byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b':' | b'/')
+        })
+}
+
+fn visible_model_slugs(models: &[Value]) -> Vec<String> {
+    let mut slugs = Vec::new();
+    for model in models {
+        if model.get("visibility").and_then(Value::as_str) != Some("list") {
+            continue;
+        }
+        let Some(slug) = model.get("slug").and_then(Value::as_str).map(str::trim) else {
+            continue;
+        };
+        if valid_model_slug(slug) && !slugs.iter().any(|existing| existing == slug) {
+            slugs.push(slug.to_string());
+        }
+    }
+    if slugs.is_empty() {
+        for model in models {
+            let Some(slug) = model.get("slug").and_then(Value::as_str).map(str::trim) else {
+                continue;
+            };
+            if valid_model_slug(slug) && !slugs.iter().any(|existing| existing == slug) {
+                slugs.push(slug.to_string());
+            }
+        }
+    }
+    slugs
+}
+
+fn select_requested_model(available: &[String], requested: &str) -> Option<String> {
+    if requested == "auto" {
+        available.first().cloned()
+    } else {
+        available
+            .iter()
+            .find(|model| model.as_str() == requested)
+            .cloned()
+    }
+}
+
 fn availability(status: u16) -> Option<bool> {
     if (200..300).contains(&status) {
         Some(true)
@@ -66,6 +114,14 @@ fn availability(status: u16) -> Option<bool> {
 }
 
 fn availability_with_code(status: u16, code: &str) -> Option<bool> {
+    if status == 403
+        && matches!(
+            code,
+            "model_not_available" | "model_not_found" | "unsupported_model"
+        )
+    {
+        return None;
+    }
     if !(200..300).contains(&status) {
         return availability(status);
     }
@@ -174,14 +230,22 @@ async fn error_code(mut response: reqwest::Response) -> String {
 }
 
 #[tauri::command]
-pub async fn probe_chatgpt_workspace(access_token: String, account_id: String) -> ProbeResult {
+pub async fn probe_chatgpt_workspace(
+    access_token: String,
+    account_id: String,
+    requested_model: String,
+) -> ProbeResult {
     let access_token = access_token.trim().to_string();
     let account_id = account_id.trim().to_string();
+    let requested_model = requested_model.trim().to_string();
     if !valid_access_token(&access_token) {
         return ProbeResult::local_error("invalid_access_token");
     }
     if !account_id.is_empty() && !valid_account_id(&account_id) {
         return ProbeResult::local_error("invalid_account_id");
+    }
+    if requested_model != "auto" && !valid_model_slug(&requested_model) {
+        return ProbeResult::local_error("invalid_requested_model");
     }
 
     let headers = match request_headers(&access_token, &account_id) {
@@ -217,6 +281,7 @@ pub async fn probe_chatgpt_workspace(access_token: String, account_id: String) -
             stage: "models",
             code: error_code(models_response).await,
             model: None,
+            available_models: Vec::new(),
         };
     }
 
@@ -226,32 +291,25 @@ pub async fn probe_chatgpt_workspace(access_token: String, account_id: String) -
         .and_then(Value::as_array)
         .cloned()
         .unwrap_or_default();
-    let selected = models
-        .iter()
-        .find(|model| {
-            model.get("visibility").and_then(Value::as_str) == Some("list")
-                && model.get("slug").and_then(Value::as_str).is_some()
-        })
-        .or_else(|| {
-            models
-                .iter()
-                .find(|model| model.get("slug").and_then(Value::as_str).is_some())
-        });
-    let model = selected
-        .and_then(|item| item.get("slug"))
-        .and_then(Value::as_str)
-        .unwrap_or_default()
-        .trim()
-        .to_string();
-    if model.is_empty() {
+    let available_models = visible_model_slugs(&models);
+    let Some(model) = select_requested_model(&available_models, &requested_model) else {
         return ProbeResult {
-            status: 502,
+            status: 200,
             available: None,
             stage: "models",
-            code: "no_available_model".to_string(),
-            model: None,
+            code: if available_models.is_empty() {
+                "no_available_model".to_string()
+            } else {
+                "requested_model_unavailable".to_string()
+            },
+            model: if requested_model == "auto" {
+                None
+            } else {
+                Some(requested_model)
+            },
+            available_models,
         };
-    }
+    };
 
     let body = json!({
         "model": model,
@@ -304,6 +362,7 @@ pub async fn probe_chatgpt_workspace(access_token: String, account_id: String) -
         stage: "response",
         code,
         model: Some(model),
+        available_models,
     }
 }
 
@@ -318,6 +377,9 @@ mod tests {
         assert!(!valid_access_token("1234567890abc\ndef"));
         assert!(valid_account_id("account_123-ABC"));
         assert!(!valid_account_id("account/123"));
+        assert!(valid_model_slug("sol"));
+        assert!(valid_model_slug("gpt-5.1-codex-mini"));
+        assert!(!valid_model_slug("model name"));
     }
 
     #[test]
@@ -342,5 +404,21 @@ mod tests {
         assert_eq!(upstream_code(&payload), "deactivated_workspace");
         let sse = b"event: response.failed\ndata: {\"type\":\"response.failed\",\"response\":{\"error\":{\"code\":\"server_is_overloaded\"}}}\n\n";
         assert_eq!(streamed_error_code(sse), "server_is_overloaded");
+    }
+
+    #[test]
+    fn selects_requested_models_without_misclassifying_free_accounts() {
+        let models = vec![
+            json!({ "slug": "gpt-free-model", "visibility": "list" }),
+            json!({ "slug": "sol", "visibility": "hide" }),
+        ];
+        let slugs = visible_model_slugs(&models);
+        assert_eq!(slugs, vec!["gpt-free-model"]);
+        assert_eq!(select_requested_model(&slugs, "sol"), None);
+        assert_eq!(
+            select_requested_model(&slugs, "auto").as_deref(),
+            Some("gpt-free-model")
+        );
+        assert_eq!(select_requested_model(&slugs, "not-entitled"), None);
     }
 }

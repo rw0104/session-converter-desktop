@@ -205,12 +205,9 @@ async function testDesktopUpstreamCheckReportsAuditedPins() {
           calls.push(command);
           if (command === "check_upstream_updates") {
             return [
-              { label: "CLIProxyAPI", status: "current" },
-              { label: "sub2api", status: "current" },
+              { label: "CLIProxyAPI", status: "current", files: [{ status: "current" }, { status: "current" }, { status: "current" }, { status: "current" }] },
+              { label: "sub2api", status: "current", files: [{ status: "current" }, { status: "current" }] },
             ];
-          }
-          if (command === "check_app_update") {
-            return { available: false, currentVersion: "0.1.3", version: null };
           }
           throw new Error(`unexpected command: ${command}`);
         },
@@ -219,9 +216,9 @@ async function testDesktopUpstreamCheckReportsAuditedPins() {
   });
   await dispatchAsync(elements.get("#check-upstream-updates"), "click");
   assert.equal(elements.get("#check-upstream-updates").disabled, false);
-  assert.equal(elements.get("#check-upstream-updates").textContent, "检查更新");
-  assert.deepEqual(calls.sort(), ["check_app_update", "check_upstream_updates"]);
-  assert.match(elements.get("#upstream-check-status").textContent, /两个算法映射均为当前审计版本/);
+  assert.equal(elements.get("#check-upstream-updates").textContent, "检查算法");
+  assert.deepEqual(calls, ["check_upstream_updates"]);
+  assert.match(elements.get("#upstream-check-status").textContent, /6 个相关文件 blob SHA/);
 }
 
 async function testSignedAppUpdateRequiresConfirmationThenInstalls() {
@@ -231,12 +228,6 @@ async function testSignedAppUpdateRequiresConfirmationThenInstalls() {
       core: {
         async invoke(command) {
           calls.push(command);
-          if (command === "check_upstream_updates") {
-            return [
-              { label: "CLIProxyAPI", status: "update_available", latestSha: "abcdef123456" },
-              { label: "sub2api", status: "current" },
-            ];
-          }
           if (command === "check_app_update") {
             return { available: true, currentVersion: "0.1.3", version: "0.1.4" };
           }
@@ -247,15 +238,15 @@ async function testSignedAppUpdateRequiresConfirmationThenInstalls() {
     },
   });
 
-  const button = elements.get("#check-upstream-updates");
+  const button = elements.get("#check-app-update");
   await dispatchAsync(button, "click");
   assert.equal(button.textContent, "更新并重启");
-  assert.match(elements.get("#upstream-check-status").textContent, /签名版 v0\.1\.4/);
+  assert.match(elements.get("#app-update-status").textContent, /签名版 v0\.1\.4/);
 
   await dispatchAsync(button, "click");
   assert.equal(calls.at(-1), "install_app_update");
   assert.equal(button.disabled, true);
-  assert.match(elements.get("#upstream-check-status").textContent, /正在重启/);
+  assert.match(elements.get("#app-update-status").textContent, /正在重启/);
 }
 
 function dispatch(element, type) {
@@ -764,6 +755,44 @@ async function testLiveCheckKeepsRateLimitedAccounts() {
   assert.match(output.value, /limited@example\.com/);
 }
 
+async function testUnavailableSelectedModelDoesNotRemoveFreeAccount() {
+  const calls = [];
+  const { elements } = loadPageScript({
+    tauri: {
+      core: {
+        async invoke(command, args) {
+          calls.push({ command, args });
+          if (command === "probe_chatgpt_workspace") {
+            return {
+              status: 200,
+              available: null,
+              stage: "models",
+              code: "requested_model_unavailable",
+              model: "sol",
+              availableModels: ["gpt-free-model"],
+            };
+          }
+          throw new Error(`unexpected command: ${command}`);
+        },
+      },
+    },
+  });
+  const input = elements.get("#session-input");
+  elements.get("#live-check-model").value = "sol";
+  input.value = JSON.stringify({
+    user: { email: "free@example.com" },
+    accessToken: jwtWithPayload({ exp: 4102444800 }),
+  });
+  dispatch(input, "input");
+  await dispatchAsync(elements.get("#live-check-button"), "click");
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].args.requestedModel, "sol");
+  assert.match(elements.get("#live-check-body").innerHTML, /账号未提供模型 sol/);
+  assert.equal(elements.get("#remove-dead-button").disabled, true);
+  assert.match(elements.get("#output").value, /free@example\.com/);
+}
+
 async function testLiveCheckRejectsWorkspaceDeniedAccounts() {
   const calls = [];
   const { elements } = loadPageScript({
@@ -1061,15 +1090,15 @@ function testSourcePinsMatchHeaderBadges() {
   assert.equal(pins.length, 2);
   assert.equal(pins[0].label, "CLIProxyAPI");
   assert.equal(pins[0].branch, "main");
-  assert.equal(pins[0].shortSha, "197f5204");
+  assert.equal(pins[0].shortSha, "2e6b1d83");
   assert.equal(pins[0].date, "2026-08-08");
-  assert.match(pins[0].commitUrl, /197f520426374e514218ed155933ac546c98d345/);
+  assert.match(pins[0].commitUrl, /2e6b1d83f6c304a102aa33c1faf0a4f94d0d331e/);
   assert.equal(pins[1].label, "sub2api");
   assert.equal(pins[1].shortSha, "cc67b1ac");
   assert.equal(pins[1].date, "2026-08-08");
   assert.equal(
     context.SessionConverterBridge.formatSourcePinLabel(pins[0]),
-    "CLIProxyAPI · 197f5204",
+    "CLIProxyAPI · 2e6b1d83",
   );
   assert.equal(
     context.SessionConverterBridge.formatSourcePinLabel(pins[1]),
@@ -1322,6 +1351,7 @@ async function main() {
   await testAgentIdentityNeverReachesTheProbeRelay();
   await testLiveCheckOnlyRemovesConfirmedUnauthorizedAccounts();
   await testLiveCheckKeepsRateLimitedAccounts();
+  await testUnavailableSelectedModelDoesNotRemoveFreeAccount();
   await testLiveCheckRejectsWorkspaceDeniedAccounts();
   await testExpiredJwtIsClassifiedLocallyWithoutNetworkRequest();
   console.log("convert-session tests passed");

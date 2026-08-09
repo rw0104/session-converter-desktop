@@ -319,16 +319,26 @@
         white-space: nowrap;
       }
 
-      .upstream-check {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        padding: 8px 2px 0;
+      .update-status-list {
+        display: grid;
+        gap: 0;
         border-top: 1px solid rgba(0, 122, 255, 0.16);
       }
 
-      .upstream-check-button {
+      .update-status-row {
+        display: flex;
+        min-height: 42px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 6px 2px;
+      }
+
+      .update-status-row + .update-status-row {
+        border-top: 1px solid rgba(0, 122, 255, 0.1);
+      }
+
+      .update-status-button {
         min-height: 30px;
         flex: 0 0 auto;
         padding: 5px 10px;
@@ -965,6 +975,30 @@
         color: var(--text);
       }
 
+      .live-check-control select {
+        min-width: 156px;
+        min-height: 32px;
+        padding: 5px 28px 5px 8px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--surface-soft);
+        color: var(--text);
+        font: inherit;
+      }
+
+      .live-check-control select:focus {
+        outline: 2px solid rgba(0, 122, 255, 0.2);
+        border-color: var(--accent);
+      }
+
+      .live-check-custom-model input {
+        width: 132px;
+      }
+
+      .live-check-custom-model[hidden] {
+        display: none;
+      }
+
       .live-check-control input:focus {
         outline: 2px solid rgba(0, 122, 255, 0.2);
         border-color: var(--accent);
@@ -1211,7 +1245,7 @@
         .topbar { padding: 14px; }
 
         .resource-panel { padding: 8px; }
-        .upstream-check { align-items: flex-start; }
+        .update-status-row { align-items: flex-start; }
         .guide-heading { align-items: stretch; flex-direction: column; }
         .session-guide .guide-open { width: 100%; }
 

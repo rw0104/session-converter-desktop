@@ -32,8 +32,8 @@ WebView 只调用六个 Rust 命令：
 | 命令 | 输入 | 输出 | 权限边界 |
 | --- | --- | --- | --- |
 | `save_output_file` | 建议文件名、字节数组 | 用户选择的最终路径 | Rust 内核打开原生保存对话框；64 MiB 上限 |
-| `probe_chatgpt_workspace` | access token、可选空间 ID | 状态、阶段、错误码、模型 | 仅固定 `chatgpt.com/backend-api/codex` 地址 |
-| `check_upstream_updates` | 无 | 两个上游的固定提交比较结果 | 仅固定 GitHub 公共仓库；不接收 URL、仓库或分支参数 |
+| `probe_chatgpt_workspace` | access token、可选空间 ID、模型 slug 或 `auto` | 状态、阶段、错误码、实际模型、可见模型 | 仅固定 `chatgpt.com/backend-api/codex` 地址；缺少所选模型不会判死账号 |
+| `check_upstream_updates` | 无 | 两个上游 6 个固定相关文件的 blob SHA 比较结果 | 仅固定 GitHub 公共仓库；不接收 URL、仓库或分支参数 |
 | `check_app_update` | 无 | 当前版本和可用正式版本 | 只读取内置 GitHub Release 更新端点 |
 | `install_app_update` | 无 | 安装错误或进程重启 | 下载后必须通过内置公钥验签；成功安装后自动重启 |
 | `open_external_url` | HTTPS URL | 成功或错误 | Rust 校验 `github.com`、`pay.ldxp.cn`、`chatgpt.com` 白名单后调用系统默认浏览器 |

@@ -52,7 +52,7 @@ jobs:
         with:
           tagName: v__VERSION__
           releaseName: Session Converter v__VERSION__
-          releaseBody: Signed cross-platform desktop installers. Version 0.1.3 is the updater-enabled baseline; future releases can be installed from inside the app.
+          releaseBody: Signed cross-platform desktop installers. Version 0.1.4 separates software updates from file-level algorithm audits and adds selectable model verification. Existing 0.1.3 installations can update in place.
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}

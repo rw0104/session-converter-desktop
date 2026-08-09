@@ -1,20 +1,19 @@
 /* Session Converter CPA ↔ sub2api bridge algorithms.
  * Browser-local only; no network.
- * Upstream pins live in SOURCE_PINS — update there when re-mapping algorithms.
+ * Upstream audit metadata is generated from config/upstream-audit.json.
  */
 (() => {
-  // Single source of truth for "已按审计版本源码映射" badges and algorithm audit.
-  // When CLIProxyAPI / sub2api change account schemas, bump these pins after re-diff.
+  // BEGIN GENERATED UPSTREAM PINS — scripts/check-upstreams.mjs owns this block.
   const SOURCE_PINS = Object.freeze([
     Object.freeze({
       id: "cliproxyapi",
       label: "CLIProxyAPI",
       branch: "main",
-      shortSha: "197f5204",
-      fullSha: "197f520426374e514218ed155933ac546c98d345",
+      shortSha: "2e6b1d83",
+      fullSha: "2e6b1d83f6c304a102aa33c1faf0a4f94d0d331e",
       date: "2026-08-08",
       repoUrl: "https://github.com/router-for-me/CLIProxyAPI",
-      commitUrl: "https://github.com/router-for-me/CLIProxyAPI/commit/197f520426374e514218ed155933ac546c98d345",
+      commitUrl: "https://github.com/router-for-me/CLIProxyAPI/commit/2e6b1d83f6c304a102aa33c1faf0a4f94d0d331e",
     }),
     Object.freeze({
       id: "sub2api",
@@ -27,6 +26,7 @@
       commitUrl: "https://github.com/Wei-Shaw/sub2api/commit/cc67b1aca1d3b590609abef2fcd3a6ca31c5c651",
     }),
   ]);
+  // END GENERATED UPSTREAM PINS
 
   function formatSourcePinLabel(pin) {
     return `${pin.label} · ${pin.shortSha}`;

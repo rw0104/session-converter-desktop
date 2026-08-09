@@ -69,6 +69,9 @@
           liveCheckBody: document.querySelector("#live-check-body"),
           liveCheckButton: document.querySelector("#live-check-button"),
           liveCheckConcurrency: document.querySelector("#live-check-concurrency"),
+          liveCheckModel: document.querySelector("#live-check-model"),
+          liveCheckCustomModel: document.querySelector("#live-check-custom-model"),
+          liveCheckCustomModelControl: document.querySelector(".live-check-custom-model"),
           liveCheckStatus: document.querySelector("#live-check-status"),
           modeButtons: Array.from(document.querySelectorAll("[data-mode]")),
           modeHint: document.querySelector("#mode-hint"),
@@ -77,6 +80,8 @@
           output: document.querySelector("#output"),
           outputStatus: document.querySelector("#output-status"),
           outputSubtitle: document.querySelector("#output-subtitle"),
+          appUpdateButton: document.querySelector("#check-app-update"),
+          appUpdateStatus: document.querySelector("#app-update-status"),
           upstreamCheckButton: document.querySelector("#check-upstream-updates"),
           upstreamCheckStatus: document.querySelector("#upstream-check-status"),
           pickFiles: document.querySelector("#pick-files"),
@@ -1231,63 +1236,89 @@
 
         async function installPendingAppUpdate() {
           const update = state.pendingAppUpdate;
-          if (!update?.available || !elements.upstreamCheckButton || !elements.upstreamCheckStatus) return;
-          elements.upstreamCheckButton.disabled = true;
-          elements.upstreamCheckButton.textContent = "安装中…";
-          setStatus(elements.upstreamCheckStatus, `正在后台下载并验证 v${update.version}；安装完成后应用会自动重启。`);
+          if (!update?.available || !elements.appUpdateButton || !elements.appUpdateStatus) return;
+          elements.appUpdateButton.disabled = true;
+          elements.appUpdateButton.textContent = "安装中…";
+          setStatus(elements.appUpdateStatus, `正在后台下载并验证 v${update.version}；安装完成后应用会自动重启。`);
           try {
             await tauri.core.invoke("install_app_update");
-            setStatus(elements.upstreamCheckStatus, "更新已安装，正在重启…", "ok");
+            setStatus(elements.appUpdateStatus, "更新已安装，正在重启…", "ok");
           } catch (error) {
             state.pendingAppUpdate = null;
-            elements.upstreamCheckButton.disabled = false;
-            elements.upstreamCheckButton.textContent = "重新检查";
-            setStatus(elements.upstreamCheckStatus, `安装失败：${error instanceof Error ? error.message : String(error)}`, "error");
+            elements.appUpdateButton.disabled = false;
+            elements.appUpdateButton.textContent = "重新检查";
+            setStatus(elements.appUpdateStatus, `安装失败：${error instanceof Error ? error.message : String(error)}`, "error");
           }
         }
 
-        async function checkUpstreamUpdates() {
-          if (!elements.upstreamCheckButton || !elements.upstreamCheckStatus) return;
+        async function checkAppUpdate() {
+          if (!elements.appUpdateButton || !elements.appUpdateStatus) return;
           if (!isDesktopRuntime) {
-            setStatus(elements.upstreamCheckStatus, "请在桌面版中检查上游更新。", "warning");
+            setStatus(elements.appUpdateStatus, "请在桌面版中检查软件更新。", "warning");
             return;
           }
           if (state.pendingAppUpdate?.available) {
             await installPendingAppUpdate();
             return;
           }
-          elements.upstreamCheckButton.disabled = true;
-          elements.upstreamCheckButton.textContent = "检查中…";
-          setStatus(elements.upstreamCheckStatus, "正在检查两个算法上游与本软件正式版本…");
+          elements.appUpdateButton.disabled = true;
+          elements.appUpdateButton.textContent = "检查中…";
+          setStatus(elements.appUpdateStatus, "正在检查本仓库的签名正式版本…");
           try {
-            const [checks, appUpdate] = await Promise.all([
-              tauri.core.invoke("check_upstream_updates"),
-              tauri.core.invoke("check_app_update"),
-            ]);
-            const updates = checks.filter((item) => item.status === "update_available");
-            const unknown = checks.filter((item) => item.status === "unknown");
+            const appUpdate = await tauri.core.invoke("check_app_update");
             state.pendingAppUpdate = appUpdate?.available ? appUpdate : null;
             if (state.pendingAppUpdate) {
-              const upstreamNote = updates.length
-                ? `；其中 ${updates.map((item) => item.label).join("、")} 的映射已发生变化`
-                : "";
-              setStatus(elements.upstreamCheckStatus, `已发布签名版 v${appUpdate.version}${upstreamNote}。点击“更新并重启”后将在后台验证并安装。`, "warning");
-              elements.upstreamCheckButton.textContent = "更新并重启";
-            } else if (updates.length) {
-              const summary = updates
-                .map((item) => `${item.label} ${String(item.latestSha || "").slice(0, 8)}`)
-                .join("、");
-              setStatus(elements.upstreamCheckStatus, `发现算法上游变化：${summary}。需完成映射审计并发布签名版后才能安装。`, "warning");
-            } else if (unknown.length) {
-              setStatus(elements.upstreamCheckStatus, `${unknown.length} 个上游暂时无法检查；未自动更改任何代码。`, "warning");
+              setStatus(elements.appUpdateStatus, `发现签名版 v${appUpdate.version}。点击“更新并重启”后将在后台验证并安装。`, "warning");
+              elements.appUpdateButton.textContent = "更新并重启";
             } else {
-              setStatus(elements.upstreamCheckStatus, `两个算法映射均为当前审计版本；软件 v${appUpdate.currentVersion} 已是最新正式版。`, "ok");
+              setStatus(elements.appUpdateStatus, `软件 v${appUpdate.currentVersion} 已是最新正式版。`, "ok");
+            }
+          } catch (error) {
+            setStatus(elements.appUpdateStatus, `检查失败：${error instanceof Error ? error.message : String(error)}`, "error");
+          } finally {
+            elements.appUpdateButton.disabled = false;
+            if (!state.pendingAppUpdate) elements.appUpdateButton.textContent = "检查软件";
+          }
+        }
+
+        async function checkUpstreamUpdates() {
+          if (!elements.upstreamCheckButton || !elements.upstreamCheckStatus) return;
+          if (!isDesktopRuntime) {
+            setStatus(elements.upstreamCheckStatus, "请在桌面版中检查算法映射。", "warning");
+            return;
+          }
+          elements.upstreamCheckButton.disabled = true;
+          elements.upstreamCheckButton.textContent = "检查中…";
+          setStatus(elements.upstreamCheckStatus, "正在比对 6 个相关文件的 Git blob SHA…");
+          try {
+            const checks = await tauri.core.invoke("check_upstream_updates");
+            const updates = checks.filter((item) => item.status === "update_available");
+            const metadataOnly = checks.filter((item) => item.status === "metadata_only");
+            const unknown = checks.filter((item) => item.status === "unknown");
+            if (updates.length) {
+              const summary = updates
+                .map((item) => {
+                  const changed = (item.files || []).filter((file) => file.status !== "current").length;
+                  return `${item.label} ${String(item.latestSha || "").slice(0, 8)}（${changed} 个文件）`;
+                })
+                .join("、");
+              setStatus(elements.upstreamCheckStatus, `发现相关算法文件变化：${summary}。自动审计会创建 Issue，完成测试后再发布软件更新。`, "warning");
+            } else if (unknown.length) {
+              setStatus(elements.upstreamCheckStatus, `${unknown.length} 个上游暂时无法检查；本地映射未被改动。`, "warning");
+            } else if (metadataOnly.length) {
+              const summary = metadataOnly
+                .map((item) => `${item.label} HEAD ${String(item.latestSha || "").slice(0, 8)}`)
+                .join("、");
+              setStatus(elements.upstreamCheckStatus, `${summary} 已前进，但相关文件 blob SHA 未变，当前映射仍有效。`, "ok");
+            } else {
+              const fileCount = checks.reduce((count, item) => count + (item.files || []).length, 0);
+              setStatus(elements.upstreamCheckStatus, `${fileCount || 6} 个相关文件 blob SHA 均与审计记录一致。`, "ok");
             }
           } catch (error) {
             setStatus(elements.upstreamCheckStatus, `检查失败：${error instanceof Error ? error.message : String(error)}`, "error");
           } finally {
             elements.upstreamCheckButton.disabled = false;
-            if (!state.pendingAppUpdate) elements.upstreamCheckButton.textContent = "检查更新";
+            elements.upstreamCheckButton.textContent = "检查算法";
           }
         }
 
@@ -1371,6 +1402,15 @@
         }
 
         function classifyLiveCheckHttpStatus(status, probe = null) {
+          if (probe?.code === "requested_model_unavailable") {
+            return { status: "unknown", reason: `账号未提供模型 ${String(probe?.model || "").trim() || "（未指定）"}` };
+          }
+          if (probe?.code === "no_available_model") {
+            return { status: "unknown", reason: "账号未返回可用模型" };
+          }
+          if (status === 403 && ["model_not_available", "model_not_found", "unsupported_model"].includes(probe?.code)) {
+            return { status: "unknown", reason: `所选模型 ${String(probe?.model || "").trim() || "（未知）"} 不可用` };
+          }
           if (status >= 200 && status < 300) {
             const model = String(probe?.model || "").trim();
             return { status: "alive", reason: model ? `${model} 实际调用可用` : `HTTP ${status} 可用` };
@@ -1398,7 +1438,7 @@
           return { status: "unknown", reason: `HTTP ${status}` };
         }
 
-        async function probeChatgptModel(item) {
+        async function probeChatgptModel(item, requestedModel) {
           if (!isLiveCheckable(item)) {
             return { status: "unknown", reason: "非 OpenAI/Codex 账号，跳过模型检测" };
           }
@@ -1441,6 +1481,7 @@
                 const probe = await tauri.core.invoke("probe_chatgpt_workspace", {
                   accessToken,
                   accountId,
+                  requestedModel,
                 });
                 const effectiveStatus = Number(probe?.status || 0);
                 const result = effectiveStatus === 0
@@ -1511,6 +1552,16 @@
         async function runLiveCheck() {
           if (state.liveChecking || !state.converted.length) return;
 
+          const modelChoice = String(elements.liveCheckModel?.value || "sol").trim();
+          const requestedModel = modelChoice === "custom"
+            ? String(elements.liveCheckCustomModel?.value || "").trim()
+            : modelChoice;
+          if (requestedModel !== "auto" && !/^[A-Za-z0-9._:\/-]{1,128}$/.test(requestedModel)) {
+            setStatus(elements.liveCheckStatus, "请输入有效的模型 slug。", "error");
+            elements.liveCheckCustomModel?.focus?.();
+            return;
+          }
+
           ensureLiveChecks();
           const runId = state.liveCheckRunId + 1;
           state.liveCheckRunId = runId;
@@ -1530,7 +1581,7 @@
               if (!next) return;
               state.liveChecks[next.index] = { status: "checking", reason: "检测中" };
               renderLiveChecks();
-              const result = await probeChatgptModel(next.item);
+              const result = await probeChatgptModel(next.item, requestedModel);
               if (state.liveCheckRunId !== runId) return;
               state.liveChecks[next.index] = result;
               completed += 1;
@@ -1547,7 +1598,8 @@
           const alive = state.liveChecks.filter((item) => item.status === "alive").length;
           const dead = state.liveChecks.filter((item) => item.status === "dead").length;
           const unknown = state.liveChecks.filter((item) => item.status === "unknown").length;
-          setStatus(elements.liveCheckStatus, `检测完成：可用 ${alive} 个，不可用 ${dead} 个，未知 ${unknown} 个。`, dead ? "error" : unknown ? "warning" : "ok");
+          const modelLabel = requestedModel === "auto" ? "自动匹配模型" : requestedModel;
+          setStatus(elements.liveCheckStatus, `${modelLabel} 检测完成：可用 ${alive} 个，不可用 ${dead} 个，未知 ${unknown} 个。`, dead ? "error" : unknown ? "warning" : "ok");
         }
 
         function downloadJsonDocument(documentValue, fileName) {
@@ -2044,7 +2096,13 @@
         elements.copyOutput.addEventListener("click", copyOutput);
         elements.downloadOutput.addEventListener("click", downloadOutput);
         elements.downloadSplit?.addEventListener("click", downloadSplitZip);
+        elements.appUpdateButton?.addEventListener("click", checkAppUpdate);
         elements.upstreamCheckButton?.addEventListener("click", checkUpstreamUpdates);
+        elements.liveCheckModel?.addEventListener("change", () => {
+          const custom = elements.liveCheckModel.value === "custom";
+          if (elements.liveCheckCustomModelControl) elements.liveCheckCustomModelControl.hidden = !custom;
+          if (custom) elements.liveCheckCustomModel?.focus?.();
+        });
         elements.liveCheckButton.addEventListener("click", runLiveCheck);
         elements.removeDeadButton.addEventListener("click", removeDeadAccountsFromOutput);
         elements.downloadCleanButton.addEventListener("click", downloadCleanOutput);

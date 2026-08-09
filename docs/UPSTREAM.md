@@ -11,10 +11,12 @@
 
 | 目标格式 | 源仓库 | 钉死提交 | 日期 | 核心依据 |
 | --- | --- | --- | --- | --- |
-| CPA | [router-for-me/CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) | `197f520426374e514218ed155933ac546c98d345`（短：`197f5204`） | 2026-08-08 | `internal/auth/codex/token.go`（`CodexTokenStorage`）、`jwt_parser.go` |
+| CPA / Codex 模型检测 | [router-for-me/CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) | `2e6b1d83f6c304a102aa33c1faf0a4f94d0d331e`（短：`2e6b1d83`） | 2026-08-08 | `internal/auth/codex/token.go`、`jwt_parser.go`、`cmd/fetch_codex_models/main.go`、`internal/runtime/executor/codex_executor_request.go` |
 | sub2api | [Wei-Shaw/sub2api](https://github.com/Wei-Shaw/sub2api) | `cc67b1aca1d3b590609abef2fcd3a6ca31c5c651`（短：`cc67b1ac`） | 2026-08-08 | `backend/internal/handler/admin/account_codex_import.go`、`backend/internal/pkg/openai/oauth.go`（`ClientID`） |
 
-页面顶部「算法与软件更新」由 `bridge.js` 的 **`SOURCE_PINS`** 渲染（HTML 含首屏静态回退）。桌面版会比较固定仓库 `main` 最新提交与这些审计钉，同时检查本仓库正式 Release。算法上游源码不会被直接下载或执行；只有完成映射复核并发布的签名安装包可以在应用内更新。两仓更新后：
+页面顶部将「软件更新」和「算法映射状态」分开。软件更新只读取本仓库签名 Release；算法检测读取 `config/upstream-audit.json`，比较上表 6 个真正相关文件在上游 `main` 树中的 Git blob SHA，不再用整个仓库 HEAD 判断算法变化。算法上游源码不会被下载或执行。
+
+`.github/workflows/upstream-audit.yml` 每日定时检查：相关文件没变时自动推进审计提交元数据并同步 `bridge.js` 徽标；相关文件变化时保留旧 blob 钉并自动创建 `upstream-audit` Issue，待映射复核和测试通过后再发布签名版本。两仓算法文件更新后：
 
 1. diff 上表对应文件；
 2. 改映射算法；
