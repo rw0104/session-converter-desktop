@@ -14,8 +14,8 @@ test('desktop page is standalone and exposes intentional resource links', async 
 
   assert.match(html, /Session Converter/);
   assert.doesNotMatch(html, /系统 WebView \+ Rust|Tauri 2\.11|runtime-summary/);
-  assert.match(html, /src="\.\/bridge\.js\?v=0\.1\.4"/);
-  assert.match(html, /src="\.\/converter\.js\?v=0\.1\.4"/);
+  assert.match(html, /src="\.\/bridge\.js\?v=0\.1\.5"/);
+  assert.match(html, /src="\.\/converter\.js\?v=0\.1\.5"/);
   assert.match(html, /id="check-app-update"/);
   assert.match(html, /id="check-upstream-updates"/);
   assert.match(html, /id="live-check-model"/);
@@ -68,9 +68,10 @@ test('conversion remains local and desktop-only capabilities are explicit', asyn
 });
 
 test('Rust health checks are pinned to Codex and never accept arbitrary URLs', async () => {
-  const [health, shell] = await Promise.all([
+  const [health, shell, cargo] = await Promise.all([
     read('src-tauri', 'src', 'health.rs'),
     read('src-tauri', 'src', 'lib.rs'),
+    read('src-tauri', 'Cargo.toml'),
   ]);
 
   assert.match(health, /https:\/\/chatgpt\.com\/backend-api\/codex/);
@@ -82,6 +83,7 @@ test('Rust health checks are pinned to Codex and never accept arbitrary URLs', a
   assert.doesNotMatch(health, /url:\s*String|endpoint:\s*String|reqwest::get/);
   assert.match(shell, /MAX_OUTPUT_BYTES: usize = 64 \* 1024 \* 1024/);
   assert.match(shell, /blocking_save_file/);
+  assert.match(cargo, /"system-proxy"/);
   assert.doesNotMatch(shell, /fn\s+write_output_file\s*\(path:/);
 });
 

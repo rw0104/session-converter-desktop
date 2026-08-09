@@ -82,7 +82,7 @@ async function githubJson(path, token, init = {}) {
     headers: {
       Accept: 'application/vnd.github+json',
       'X-GitHub-Api-Version': '2022-11-28',
-      'User-Agent': 'session-converter-upstream-audit/0.1.4',
+      'User-Agent': 'session-converter-upstream-audit/0.1.5',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(init.headers || {}),
     },

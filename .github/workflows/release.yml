@@ -52,7 +52,7 @@ jobs:
         with:
           tagName: v__VERSION__
           releaseName: Session Converter v__VERSION__
-          releaseBody: Signed cross-platform desktop installers. Version 0.1.4 separates software updates from file-level algorithm audits and adds selectable model verification. Existing 0.1.3 installations can update in place.
+          releaseBody: Signed cross-platform desktop installers. Version 0.1.5 keeps the separated software/algorithm checks and enables Windows/macOS system-proxy discovery for updater and network requests.
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
