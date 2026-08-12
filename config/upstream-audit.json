@@ -1,14 +1,14 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-11",
+  "updatedAt": "2026-08-12",
   "upstreams": [
     {
       "id": "cliproxyapi",
       "label": "CLIProxyAPI",
       "repository": "router-for-me/CLIProxyAPI",
       "branch": "main",
-      "auditedCommit": "bd34ceca04209ef0460f4b05e3a1a047fb7fad2a",
-      "auditedDate": "2026-08-10",
+      "auditedCommit": "934da2379d6272a704953a02322b666b2a2efa3e",
+      "auditedDate": "2026-08-11",
       "files": [
         {
           "path": "internal/auth/codex/token.go",
@@ -33,8 +33,8 @@
       "label": "sub2api",
       "repository": "Wei-Shaw/sub2api",
       "branch": "main",
-      "auditedCommit": "0f73203e35d3e530f4245a32ec3e0f00472cfc38",
-      "auditedDate": "2026-08-11",
+      "auditedCommit": "4ec9ceec4adac9b7679848347164804451bca48a",
+      "auditedDate": "2026-08-12",
       "files": [
         {
           "path": "backend/internal/handler/admin/account_codex_import.go",
