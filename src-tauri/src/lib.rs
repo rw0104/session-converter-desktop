@@ -9,7 +9,7 @@ use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 
 const MAX_OUTPUT_BYTES: usize = 64 * 1024 * 1024;
-const EXTERNAL_HOSTS: [&str; 3] = ["github.com", "pay.ldxp.cn", "chatgpt.com"];
+const EXTERNAL_HOSTS: [&str; 2] = ["github.com", "chatgpt.com"];
 
 fn allowed_external_url(value: &str) -> bool {
     let Ok(url) = reqwest::Url::parse(value) else {
@@ -123,7 +123,7 @@ mod tests {
         assert!(allowed_external_url(
             "https://github.com/rw0104/session-converter-desktop"
         ));
-        assert!(allowed_external_url("https://pay.ldxp.cn/shop/13QL6FLR"));
+        assert!(!allowed_external_url("https://pay.ldxp.cn/shop/13QL6FLR"));
         assert!(allowed_external_url("https://chatgpt.com/api/auth/session"));
         assert!(!allowed_external_url(
             "http://github.com/rw0104/session-converter-desktop"

@@ -293,8 +293,6 @@
       }
 
       .resource-icon svg { width: 15px; height: 15px; fill: currentColor; }
-      .purchase-link .resource-icon { background: #fff2e8; color: #c7590a; }
-      .purchase-link .resource-icon svg { fill: none; }
       .resource-arrow { color: var(--muted); font-size: 0.8rem; }
 
       .meta-row {

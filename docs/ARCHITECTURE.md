@@ -36,7 +36,7 @@ WebView 只调用六个 Rust 命令：
 | `check_upstream_updates` | 无 | 两个上游 6 个固定相关文件的 blob SHA 比较结果 | 仅固定 GitHub 公共仓库；不接收 URL、仓库或分支参数 |
 | `check_app_update` | 无 | 当前版本和可用正式版本 | 只读取内置 GitHub Release 更新端点 |
 | `install_app_update` | 无 | 安装错误或进程重启 | 下载后必须通过内置公钥验签；成功安装后自动重启 |
-| `open_external_url` | HTTPS URL | 成功或错误 | Rust 校验 `github.com`、`pay.ldxp.cn`、`chatgpt.com` 白名单后调用系统默认浏览器 |
+| `open_external_url` | HTTPS URL | 成功或错误 | Rust 校验 `github.com`、`chatgpt.com` 白名单后调用系统默认浏览器 |
 
 转换本身不跨 IPC；这样避免在每次字段转换时产生序列化和进程切换开销。
 

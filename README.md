@@ -11,7 +11,7 @@
 - sub2api Agent Identity 凭证识别与 Ed25519 PKCS#8 结构校验
 - 可选的 Codex 真实模型检测；仅在用户主动点击后执行
 - 同时检测两个固定算法上游和本软件正式版本；签名新版可在应用内安装并自动重启
-- 项目、采购和 Session 获取链接通过系统默认浏览器打开
+- 项目和 Session 获取链接通过系统默认浏览器打开
 
 转换算法在 WebView 内存中运行，不调用网络，也不使用 `localStorage`、Cookie、IndexedDB 或数据库。可选模型检测由 Rust 内核直接请求 OpenAI Codex；access token 不写入磁盘或日志。
 

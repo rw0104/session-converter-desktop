@@ -28,7 +28,7 @@ test('desktop page is standalone and exposes intentional resource links', async 
   assert.doesNotMatch(html, /add phone|手机绑定验证/);
   assert.match(html, /账号风险验证或 MFA/);
   assert.match(html, /https:\/\/github\.com\/rw0104\/session-converter-desktop/);
-  assert.match(html, /https:\/\/pay\.ldxp\.cn\/shop\/13QL6FLR/);
+  assert.doesNotMatch(html, /pay\.ldxp\.cn|账号采购/);
   assert.doesNotMatch(html, /项目主页|gpt-account-promo|返回兑换页/);
   assert.doesNotMatch(html, /<script(?![^>]+src=)[^>]*>/i);
   assert.doesNotMatch(html, /<style(?:\s|>)/i);
@@ -101,7 +101,7 @@ test('upstream and external-link commands only use fixed destinations', async ()
   assert.match(upstream, /git\/trees/);
   assert.match(upstream, /pinned_blob_sha/);
   assert.doesNotMatch(upstream, /check_upstream_updates\([^)]*(url|repository|branch)/);
-  assert.match(shell, /EXTERNAL_HOSTS: \[&str; 3\]/);
+  assert.match(shell, /EXTERNAL_HOSTS: \[&str; 2\]/);
   assert.match(shell, /open_external_url\(app: tauri::AppHandle, url: String\)/);
   assert.match(shell, /tauri_plugin_updater::Builder/);
   assert.match(appUpdate, /download_and_install/);
