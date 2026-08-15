@@ -14,8 +14,8 @@ test('desktop page is standalone and exposes intentional resource links', async 
 
   assert.match(html, /Session Converter/);
   assert.doesNotMatch(html, /系统 WebView \+ Rust|Tauri 2\.11|runtime-summary/);
-  assert.match(html, /src="\.\/bridge\.js\?v=0\.1\.5"/);
-  assert.match(html, /src="\.\/converter\.js\?v=0\.1\.5"/);
+  assert.match(html, /src="\.\/bridge\.js\?v=0\.1\.6"/);
+  assert.match(html, /src="\.\/converter\.js\?v=0\.1\.6"/);
   assert.match(html, /id="check-app-update"/);
   assert.match(html, /id="check-upstream-updates"/);
   assert.match(html, /id="live-check-model"/);
@@ -115,7 +115,7 @@ test('upstream schema pins and license provenance travel with the extraction', a
     read('LICENSE'),
   ]);
 
-  assert.match(bridge, /934da2379d6272a704953a02322b666b2a2efa3e/);
+  assert.match(bridge, /78f0c4079e3e6273d65d03b5549cffc898703264/);
   assert.match(bridge, /c204d33b09ebfefe96c1d4dcb16a88590992257e/);
   assert.match(upstream, /gtxx3600\/GPTSession2CPAandSub2API/);
   assert.match(license, /MIT License/);

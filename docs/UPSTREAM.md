@@ -11,7 +11,7 @@
 
 | 目标格式 | 源仓库 | 钉死提交 | 日期 | 核心依据 |
 | --- | --- | --- | --- | --- |
-| CPA / Codex 模型检测 | [router-for-me/CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) | `934da2379d6272a704953a02322b666b2a2efa3e`（短：`934da237`） | 2026-08-11 | `internal/auth/codex/token.go`、`jwt_parser.go`、`cmd/fetch_codex_models/main.go`、`internal/runtime/executor/codex_executor_request.go` |
+| CPA / Codex 模型检测 | [router-for-me/CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) | `78f0c4079e3e6273d65d03b5549cffc898703264`（短：`78f0c407`） | 2026-08-14 | `internal/auth/codex/token.go`、`jwt_parser.go`、`cmd/fetch_codex_models/main.go`、`internal/runtime/executor/codex_executor_request.go` |
 | sub2api | [Wei-Shaw/sub2api](https://github.com/Wei-Shaw/sub2api) | `c204d33b09ebfefe96c1d4dcb16a88590992257e`（短：`c204d33b`） | 2026-08-15 | `backend/internal/handler/admin/account_codex_import.go`、`backend/internal/pkg/openai/oauth.go`（`ClientID`） |
 
 页面顶部将「软件更新」和「算法映射状态」分开。软件更新只读取本仓库签名 Release；算法检测读取 `config/upstream-audit.json`，比较上表 6 个真正相关文件在上游 `main` 树中的 Git blob SHA，不再用整个仓库 HEAD 判断算法变化。算法上游源码不会被下载或执行。
@@ -84,5 +84,6 @@ Agent Identity 行为要点（对齐 `2730c1c4`）：
 - 2026-08-08：重新复核并钉到 CLIProxyAPI `197f5204` / sub2api `cc67b1ac`。账户 schema 文件无内容变化；Codex 检测身份更新为配套的 `codex-tui/0.146.0`、`Originator: codex-tui`、`Version: 0.146.0`，Responses 请求补 `OpenAI-Beta: responses=experimental`。
 - 2026-08-08：检测开始读取最多 256 KiB 的 SSE 响应并识别流内错误。明确停用/鉴权错误才标记不可用；`server_is_overloaded`、限流、网络错误和 5xx 保持未知，避免误清理。
 - 2026-08-08：原始 Session 转换上游仍为 `a097eb15`，没有新提交。本项目继续以 access JWT `exp` 为 token 到期依据，`sessionToken` 为可选字段，Session Cookie `expires` 只存入 `extra.session_expires_at`。
+- 2026-08-14：CLIProxyAPI 推进到 `78f0c407` 并复核。`token.go` 仅为重构（logrus 导入、`MergeMetadata` 调用提前、Close 错误日志），`CodexTokenStorage` schema 无任何字段变化；`codex_executor_request.go` 将代理层头部 `Session_id` 改名 `Session-Id`（HTTP 头大小写不敏感，与本机检测下发的 `session_id` 语义等价）、透传 `X-Codex-Window-Id` / `Thread-Id` / `Session-Id` / `X-Openai-Internal-Codex-Responses-Lite`（均为代理透传，非客户端默认值），并移除仅对 Mac OS UA 生效的 `Session_id` 生成特例。本机检测为直连最小实现，不实现代理的 identity-confusion / prompt-cache 层，映射与检测算法无需改动，钉值随之推进。
 
 本地检测只筛除确认 401、402、403 或本地确认过期的转换项，不改写其余输出字段。真实模型检测会产生极少量模型用量。后续升级必须重新核对 CLIProxyAPI / sub2api 账户 schema 与官方 Codex 请求协议，并执行安全审计、上游测试和桌面应用回归测试。
