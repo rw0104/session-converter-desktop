@@ -1091,19 +1091,19 @@ function testSourcePinsMatchHeaderBadges() {
   assert.equal(pins.length, 2);
   assert.equal(pins[0].label, "CLIProxyAPI");
   assert.equal(pins[0].branch, "main");
-  assert.equal(pins[0].shortSha, "2e6b1d83");
-  assert.equal(pins[0].date, "2026-08-08");
-  assert.match(pins[0].commitUrl, /2e6b1d83f6c304a102aa33c1faf0a4f94d0d331e/);
+  assert.equal(pins[0].shortSha, "934da237");
+  assert.equal(pins[0].date, "2026-08-11");
+  assert.match(pins[0].commitUrl, /934da2379d6272a704953a02322b666b2a2efa3e/);
   assert.equal(pins[1].label, "sub2api");
-  assert.equal(pins[1].shortSha, "cc67b1ac");
-  assert.equal(pins[1].date, "2026-08-08");
+  assert.equal(pins[1].shortSha, "c204d33b");
+  assert.equal(pins[1].date, "2026-08-15");
   assert.equal(
     context.SessionConverterBridge.formatSourcePinLabel(pins[0]),
-    "CLIProxyAPI · 2e6b1d83",
+    "CLIProxyAPI · 934da237",
   );
   assert.equal(
     context.SessionConverterBridge.formatSourcePinLabel(pins[1]),
-    "sub2api · cc67b1ac",
+    "sub2api · c204d33b",
   );
 }
 

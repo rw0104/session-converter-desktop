@@ -115,8 +115,8 @@ test('upstream schema pins and license provenance travel with the extraction', a
     read('LICENSE'),
   ]);
 
-  assert.match(bridge, /2e6b1d83f6c304a102aa33c1faf0a4f94d0d331e/);
-  assert.match(bridge, /cc67b1aca1d3b590609abef2fcd3a6ca31c5c651/);
+  assert.match(bridge, /934da2379d6272a704953a02322b666b2a2efa3e/);
+  assert.match(bridge, /c204d33b09ebfefe96c1d4dcb16a88590992257e/);
   assert.match(upstream, /gtxx3600\/GPTSession2CPAandSub2API/);
   assert.match(license, /MIT License/);
   assert.match(license, /Dehujiaogeli/);

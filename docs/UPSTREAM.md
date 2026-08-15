@@ -11,8 +11,8 @@
 
 | 目标格式 | 源仓库 | 钉死提交 | 日期 | 核心依据 |
 | --- | --- | --- | --- | --- |
-| CPA / Codex 模型检测 | [router-for-me/CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) | `2e6b1d83f6c304a102aa33c1faf0a4f94d0d331e`（短：`2e6b1d83`） | 2026-08-08 | `internal/auth/codex/token.go`、`jwt_parser.go`、`cmd/fetch_codex_models/main.go`、`internal/runtime/executor/codex_executor_request.go` |
-| sub2api | [Wei-Shaw/sub2api](https://github.com/Wei-Shaw/sub2api) | `cc67b1aca1d3b590609abef2fcd3a6ca31c5c651`（短：`cc67b1ac`） | 2026-08-08 | `backend/internal/handler/admin/account_codex_import.go`、`backend/internal/pkg/openai/oauth.go`（`ClientID`） |
+| CPA / Codex 模型检测 | [router-for-me/CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) | `934da2379d6272a704953a02322b666b2a2efa3e`（短：`934da237`） | 2026-08-11 | `internal/auth/codex/token.go`、`jwt_parser.go`、`cmd/fetch_codex_models/main.go`、`internal/runtime/executor/codex_executor_request.go` |
+| sub2api | [Wei-Shaw/sub2api](https://github.com/Wei-Shaw/sub2api) | `c204d33b09ebfefe96c1d4dcb16a88590992257e`（短：`c204d33b`） | 2026-08-15 | `backend/internal/handler/admin/account_codex_import.go`、`backend/internal/pkg/openai/oauth.go`（`ClientID`） |
 
 页面顶部将「软件更新」和「算法映射状态」分开。软件更新只读取本仓库签名 Release；算法检测读取 `config/upstream-audit.json`，比较上表 6 个真正相关文件在上游 `main` 树中的 Git blob SHA，不再用整个仓库 HEAD 判断算法变化。算法上游源码不会被下载或执行。
 
