@@ -101,6 +101,7 @@ function loadPageScript(overrides = {}) {
   const context = {
     AbortController,
     Array,
+    Blob,
     Boolean,
     Date,
     Error,
@@ -161,7 +162,7 @@ async function testDesktopExternalLinksUseRustAllowlistedCommand() {
     },
   });
   let prevented = false;
-  const link = { href: "https://pay.ldxp.cn/shop/13QL6FLR" };
+  const link = { href: "https://github.com/rw0104/session-converter-desktop" };
   context.document.listeners.click({
     target: { closest: () => link },
     preventDefault() { prevented = true; },
@@ -169,7 +170,7 @@ async function testDesktopExternalLinksUseRustAllowlistedCommand() {
   await Promise.resolve();
   assert.equal(prevented, true);
   assert.equal(calls[0].command, "open_external_url");
-  assert.equal(calls[0].args.url, "https://pay.ldxp.cn/shop/13QL6FLR");
+  assert.equal(calls[0].args.url, "https://github.com/rw0104/session-converter-desktop");
 }
 
 async function testDroppedJsonConvertsImmediately() {
@@ -1319,6 +1320,256 @@ function testSub2apiAgentIdentityAccountCannotConvertToCpa() {
   assert.match(elements.get("#issues").innerHTML, /Agent Identity 凭据无法转换为 CPA/);
 }
 
+function settleTicks(count = 2) {
+  return new Promise((resolve) => {
+    let left = count;
+    const tick = () => {
+      left -= 1;
+      if (left <= 0) resolve();
+      else setImmediate(tick);
+    };
+    setImmediate(tick);
+  });
+}
+
+function enableAutoDetect(elements) {
+  const auto = elements.get("#auto-detect-mode");
+  auto.checked = true;
+  auto.listeners.change?.({ target: auto });
+  return auto;
+}
+
+async function importFiles(files) {
+  const page = loadPageScript();
+  enableAutoDetect(page.elements);
+  const fileInput = page.elements.get("#file-input");
+  fileInput.files = files;
+  fileInput.listeners.change({ target: fileInput });
+  await settleTicks();
+  return page;
+}
+
+// Mixed-format batches must be recognized per file and converted in one pass
+// instead of forcing every file through a single detected mode.
+async function testAutoDetectMixedFilesConvertsEachFormat() {
+  const { elements, modeButtons } = await importFiles([
+    {
+      name: "session.json",
+      async text() {
+        return JSON.stringify({
+          user: { email: "sess@example.com" },
+          account: { id: "acc-s", planType: "plus" },
+          accessToken: "session-at",
+          sessionToken: "st",
+        });
+      },
+    },
+    {
+      name: "cpa.json",
+      async text() {
+        return JSON.stringify({ type: "codex", email: "cpa@example.com", access_token: "at1", account_id: "acc-1" });
+      },
+    },
+    {
+      name: "sub.json",
+      async text() {
+        return JSON.stringify({
+          type: "sub2api-data",
+          version: 1,
+          proxies: [],
+          accounts: [{
+            name: "sub@example.com",
+            platform: "anthropic",
+            type: "oauth",
+            credentials: { access_token: "at2", email: "sub@example.com" },
+          }],
+        });
+      },
+    },
+  ]);
+
+  assert.match(elements.get("#input-status").textContent, /已自动识别 3 种输入格式/);
+  assert.equal(elements.get("#stat-count").textContent, "3");
+  assert.equal(elements.get("#stat-errors").textContent, "0");
+  assert.equal(elements.get("#session-input").value.includes("sess@example.com"), true);
+
+  // 1/1/1 tie: sub-to-cpa wins. The merged CPA list only contains converted
+  // content: the CPA file has no counterpart in this direction, so it is
+  // reported instead of leaking the raw source file into the output.
+  assert.equal(
+    modeButtons.find((button) => button.dataset.mode === "sub-to-cpa").attributes["aria-pressed"],
+    "true",
+  );
+  const document = JSON.parse(elements.get("#output").value);
+  assert.equal(document.type, "cliproxyapi-auth-list");
+  assert.deepEqual(
+    document.auths.map((auth) => auth.email),
+    ["sess@example.com", "sub@example.com"],
+  );
+  assert.match(elements.get("#output-subtitle").textContent, /另有 1 个账号无对应输出字段/);
+}
+
+// Regression: after importing bridge-format files the input box holds joined
+// raw payloads; manually clicking "Session → 多格式" used to throw
+// JSON 解析失败 and wipe the correctly recognized accounts.
+async function testManualModeSwitchAfterBridgeImportKeepsResults() {
+  const { elements, modeButtons, formatButtons } = loadPageScript();
+  enableAutoDetect(elements);
+  const fileInput = elements.get("#file-input");
+  fileInput.files = [
+    {
+      name: "one.json",
+      async text() {
+        return JSON.stringify({ type: "codex", email: "one@example.com", access_token: "at1", account_id: "acc-1" });
+      },
+    },
+    {
+      name: "two.json",
+      async text() {
+        return JSON.stringify({ type: "codex", email: "two@example.com", access_token: "at2", account_id: "acc-2" });
+      },
+    },
+  ];
+  fileInput.listeners.change({ target: fileInput });
+  await settleTicks();
+
+  assert.equal(elements.get("#stat-count").textContent, "2");
+  assert.match(elements.get("#input-status").textContent, /已自动识别为「CPA → sub2api」/);
+
+  dispatch(modeButtons.find((button) => button.dataset.mode === "session"), "click");
+
+  assert.doesNotMatch(elements.get("#input-status").textContent, /JSON 解析失败/);
+  assert.equal(elements.get("#stat-count").textContent, "2");
+  assert.match(elements.get("#input-status").textContent, /解析完成：2 个账号/);
+
+  dispatch(formatButtons.find((button) => button.dataset.format === "cpa"), "click");
+  const cpaDoc = JSON.parse(elements.get("#output").value);
+  assert.equal(Array.isArray(cpaDoc), true);
+  assert.equal(cpaDoc.length, 2);
+  assert.equal(cpaDoc[0].email, "one@example.com");
+  assert.equal(cpaDoc[0].access_token, "at1");
+}
+
+// Session mode must accept JSON lines / concatenated payloads so re-parsing
+// the input box after an import never fails.
+function testSessionModeParsesJsonLinesWithoutThrowing() {
+  const { elements } = loadPageScript();
+  const input = elements.get("#session-input");
+  const output = elements.get("#output");
+
+  input.value = [
+    JSON.stringify({ user: { email: "a@example.com" }, accessToken: "at-a" }),
+    JSON.stringify({ user: { email: "b@example.com" }, accessToken: "at-b" }),
+  ].join("\n");
+  dispatch(input, "input");
+
+  assert.equal(elements.get("#stat-count").textContent, "2");
+  assert.equal(elements.get("#stat-errors").textContent, "0");
+  const document = JSON.parse(output.value);
+  assert.equal(document.accounts.length, 2);
+  assert.equal(document.accounts[0].credentials.access_token, "at-a");
+}
+
+// Mixed-format pastes are also detected per entry and converted together.
+function testAutoDetectMixedPasteConvertsEachFormat() {
+  const { elements, modeButtons } = loadPageScript();
+  enableAutoDetect(elements);
+  const input = elements.get("#session-input");
+
+  input.value = [
+    JSON.stringify({ type: "codex", email: "cpa@example.com", access_token: "at1", account_id: "acc-1" }),
+    JSON.stringify({ user: { email: "sess@example.com" }, accessToken: "session-at" }),
+  ].join("\n");
+  dispatch(input, "input");
+
+  assert.equal(elements.get("#stat-count").textContent, "2");
+  assert.equal(elements.get("#stat-errors").textContent, "0");
+  assert.match(elements.get("#input-status").textContent, /已自动识别 2 种输入格式/);
+  assert.equal(
+    modeButtons.find((button) => button.dataset.mode === "cpa-to-sub").attributes["aria-pressed"],
+    "true",
+  );
+  const document = JSON.parse(elements.get("#output").value);
+  assert.equal(document.type, "sub2api-data");
+  assert.deepEqual(
+    document.accounts.map((account) => account.credentials.email),
+    ["cpa@example.com", "sess@example.com"],
+  );
+}
+
+// "下载 JSON" must never contain pre-conversion content: neither right after
+// a mixed import, nor after manually switching mode/format.
+async function testDownloadsContainConvertedContentOnly() {
+  const saved = [];
+  const { elements, modeButtons, formatButtons } = loadPageScript({
+    tauri: {
+      core: {
+        async invoke(command, args) {
+          if (command === "save_output_file") {
+            saved.push({ name: args.suggestedName, text: Buffer.from(args.bytes).toString("utf8") });
+            return "C:\\fake\\" + args.suggestedName;
+          }
+          return null;
+        },
+      },
+    },
+  });
+  enableAutoDetect(elements);
+  const fileInput = elements.get("#file-input");
+  fileInput.files = [
+    {
+      name: "cpa.json",
+      async text() {
+        return JSON.stringify({ type: "codex", email: "cpa@example.com", access_token: "raw-cpa-token", account_id: "acc-1" });
+      },
+    },
+    {
+      name: "sub.json",
+      async text() {
+        return JSON.stringify({
+          type: "sub2api-data",
+          version: 1,
+          proxies: [],
+          accounts: [{
+            name: "sub@example.com",
+            platform: "anthropic",
+            type: "oauth",
+            credentials: { access_token: "sub-token", email: "sub@example.com" },
+          }],
+        });
+      },
+    },
+  ];
+  fileInput.listeners.change({ target: fileInput });
+  await settleTicks();
+
+  // sub-to-cpa wins the tie; single cpaFile download = the converted auth.
+  elements.get("#download-output").listeners.click({ target: elements.get("#download-output") });
+  await settleTicks();
+
+  assert.equal(saved.length, 1);
+  const convertedAuth = JSON.parse(saved[0].text);
+  assert.equal(convertedAuth.type, "claude");
+  assert.equal(convertedAuth.access_token, "sub-token");
+  assert.doesNotMatch(saved[0].text, /raw-cpa-token/);
+  assert.match(elements.get("#output-subtitle").textContent, /另有 1 个账号无对应输出字段/);
+
+  // Manual switch to "Session → 多格式" then CPA: the download is the
+  // session-pipeline conversion (has last_refresh/id_token), not the raw file.
+  dispatch(modeButtons.find((button) => button.dataset.mode === "session"), "click");
+  dispatch(formatButtons.find((button) => button.dataset.format === "cpa"), "click");
+  elements.get("#download-output").listeners.click({ target: elements.get("#download-output") });
+  await settleTicks();
+
+  assert.equal(saved.length, 2);
+  const cpaDocs = JSON.parse(saved[1].text);
+  assert.equal(Array.isArray(cpaDocs), true);
+  assert.equal(cpaDocs.length, 2);
+  assert.equal(cpaDocs[0].access_token, "raw-cpa-token");
+  assert.equal(typeof cpaDocs[0].last_refresh, "string");
+  assert.equal(typeof cpaDocs[0].id_token, "string");
+}
+
 async function main() {
   await testDesktopExternalLinksUseRustAllowlistedCommand();
   await testDroppedJsonConvertsImmediately();
@@ -1348,6 +1599,11 @@ async function main() {
   testAgentIdentityRejectsIncompleteRecords();
   testAgentIdentityIsDroppedFromCodexTokenStorageFormats();
   testSub2apiAgentIdentityAccountCannotConvertToCpa();
+  testSessionModeParsesJsonLinesWithoutThrowing();
+  testAutoDetectMixedPasteConvertsEachFormat();
+  await testAutoDetectMixedFilesConvertsEachFormat();
+  await testManualModeSwitchAfterBridgeImportKeepsResults();
+  await testDownloadsContainConvertedContentOnly();
   await testAgentIdentityNeverReachesTheProbeRelay();
   await testLiveCheckOnlyRemovesConfirmedUnauthorizedAccounts();
   await testLiveCheckKeepsRateLimitedAccounts();

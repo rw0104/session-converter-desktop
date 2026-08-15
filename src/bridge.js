@@ -671,6 +671,8 @@
         platform: result.platform,
         provider: result.provider,
         sub2apiAccount: result.account,
+        // No cross-direction shape: the raw source record must never leak into
+        // output documents or downloads (converted content only).
         cpa: null,
         fileName: uniqueFileName(sub2apiImportFileName(result.account, entry.name), usedNames),
       });
@@ -734,6 +736,8 @@
         expiresAt: result.account.expired === "0" ? undefined : result.account.expired,
         platform: result.platform,
         provider: result.provider,
+        // No cross-direction shape: the raw source account must never leak into
+        // output documents or downloads (converted content only).
         sub2apiAccount: null,
         cpa: result.account,
         fileName,
@@ -959,6 +963,30 @@
     return false;
   }
 
+  // Single-entry counterpart of detectInputMode: names the pipeline an already
+  // parsed JSON entry should run through. Used by the per-entry auto pipeline
+  // so mixed-format imports and pastes convert in one pass.
+  function classifyEntryMode(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    const data = unwrapSub2APIEnvelope(value);
+    if (
+      SUPPORTED_SUB2API_DATA_TYPES.has(data?.type)
+      || (
+        Array.isArray(data?.accounts)
+        && (data?.version !== undefined || data?.exported_at !== undefined || data?.proxies !== undefined)
+      )
+    ) {
+      return "sub-to-cpa";
+    }
+    if (data?.type === "cliproxyapi-auth-list" && Array.isArray(data?.auths)) {
+      return "cpa-to-sub";
+    }
+    if (looksLikeSessionObject(value)) return "session";
+    if (looksLikeCpaAuth(value)) return "cpa-to-sub";
+    if (looksLikeSub2apiAccount(value)) return "sub-to-cpa";
+    return null;
+  }
+
   function scoreEntries(entries) {
     let session = 0;
     let cpa = 0;
@@ -1146,6 +1174,7 @@
     buildZipFromSub2apiFiles,
     buildSub2APIImportBody,
     detectInputMode,
+    classifyEntryMode,
     looksLikeCpaAuth,
     looksLikeSub2apiAccount,
     looksLikeSessionObject,

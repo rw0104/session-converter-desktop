@@ -41,7 +41,6 @@
           sub2apiFiles: [],
           bridgeOutput: null,
           autoDetectMode: true,
-          lastAutoMode: null,
           pendingAppUpdate: null,
         };
 
@@ -609,19 +608,65 @@
           return found;
         }
 
-        function parseInputDocuments(text) {
+        function parseInputDocuments(text, sourceName = "pasted-json") {
           if (typeof text !== "string" || text.trim() === "") {
-            return [];
+            return { sources: [], errors: [] };
           }
 
-          let parsed;
-          try {
-            parsed = JSON.parse(text);
-          } catch (error) {
-            throw new Error(`JSON 解析失败：${error.message}`);
+          // Tolerant parse: single JSON, JSON lines, or a concatenated
+          // sequence. Input boxes can hold several imported file payloads
+          // joined by newlines, so strict JSON.parse would throw here.
+          const parsed = bridge.parseInputText(text, sourceName);
+          const errors = parsed.errors.map((error) => ({
+            sourceName: error.source,
+            path: "$",
+            reason: `JSON 解析失败：${error.reason}`,
+          }));
+          const sources = [];
+          for (const entry of parsed.entries) {
+            sources.push(...collectSessionLikeObjects(entry.value, entry.name));
+          }
+          return { sources, errors };
+        }
+
+        // Converts one text payload with the Session → 多格式 pipeline and
+        // returns the pieces so callers can merge results across payloads.
+        function convertSessionText(text, sourceName = "pasted-json") {
+          const now = new Date();
+          const { sources, errors } = parseInputDocuments(text, sourceName);
+          const converted = [];
+          const skipped = [...errors];
+          const warnings = [];
+
+          sources.forEach((item) => {
+            try {
+              const result = convertSession(item.value, {
+                now,
+                sourceName: item.sourceName,
+                sourcePath: item.path,
+              });
+              converted.push(result);
+              for (const warning of result.warnings || []) {
+                warnings.push({ sourceName: item.sourceName, path: item.path, reason: warning });
+              }
+            } catch (error) {
+              skipped.push({
+                sourceName: item.sourceName,
+                path: item.path,
+                reason: error instanceof Error ? error.message : "无法转换",
+              });
+            }
+          });
+
+          if (!sources.length && !errors.length) {
+            skipped.push({
+              sourceName,
+              path: "$",
+              reason: "未找到包含 accessToken 和 user/email 的 session 对象",
+            });
           }
 
-          return collectSessionLikeObjects(parsed);
+          return { converted, skipped, warnings, sources };
         }
 
         // sub2api account_codex_import.go: Agent Identity carries no OAuth
@@ -1035,18 +1080,35 @@
             version: SUB2API_DATA_VERSION,
             exported_at: normalizeTimestamp(now),
             proxies: [],
-            accounts: converted.map((item) => item.sub2apiAccount),
+            accounts: converted.map((item) => item.sub2apiAccount).filter(Boolean),
           };
         }
 
         function buildOutputDocument(convertedItems = state.converted) {
           if (state.mode !== "session") {
-            return state.bridgeOutput;
+            const output = state.bridgeOutput;
+            // Bridge modes never emit an empty envelope/list: when mixed
+            // batches converted accounts that have no counterpart in this
+            // direction, there is nothing to download.
+            if (!output) {
+              return null;
+            }
+            if (Array.isArray(output.accounts) && !output.accounts.length) {
+              return null;
+            }
+            if (Array.isArray(output.auths) && !output.auths.length) {
+              return null;
+            }
+            return output;
           }
 
           const now = new Date();
           if (state.format === "sub2api") {
-            return buildSub2apiDocument(convertedItems, now);
+            const items = itemsForSessionFormat(convertedItems, "sub2api");
+            if (!items.length) {
+              return null;
+            }
+            return buildSub2apiDocument(items, now);
           }
 
           const formatKey = SESSION_FORMAT_KEYS[state.format];
@@ -1065,8 +1127,13 @@
 
         // Agent Identity records exist only in sub2api; CodexTokenStorage has no
         // runtime / private-key fields, so CPA-family formats drop them instead
-        // of emitting an auth file with the credentials missing.
+        // of emitting an auth file with the credentials missing. Bridge records
+        // from other directions may also lack the requested output shape and are
+        // dropped the same way.
         function itemsForSessionFormat(convertedItems, format) {
+          if (format === "sub2api") {
+            return convertedItems.filter((item) => item.sub2apiAccount);
+          }
           const key = SESSION_FORMAT_KEYS[format];
           if (!key) {
             return convertedItems;
@@ -1111,7 +1178,9 @@
         function buildSessionSub2apiFiles(convertedItems = state.converted, now = new Date()) {
           const exportedAt = normalizeTimestamp(now);
           const usedNames = new Set();
-          return convertedItems.map((item, index) => {
+          return convertedItems
+            .filter((item) => item.sub2apiAccount)
+            .map((item, index) => {
             const account = item.sub2apiAccount;
             const fallback = item.email || item.name || `account-${index + 1}`;
             const platform = sanitizeFileToken(account?.platform || "openai");
@@ -1159,22 +1228,126 @@
           return null;
         }
 
-        function maybeAutoDetectMode(text) {
-          if (!state.autoDetectMode || !text.trim()) {
-            state.lastAutoMode = null;
-            return null;
+        function pickDominantMode(modeCounts) {
+          let best = null;
+          let bestCount = -1;
+          // More specific bridge formats win ties over the generic session mode.
+          for (const mode of ["sub-to-cpa", "cpa-to-sub", "session"]) {
+            const count = modeCounts.get(mode) || 0;
+            if (count > bestCount) {
+              best = mode;
+              bestCount = count;
+            }
           }
-          const detected = bridge.detectInputMode(text);
-          if (!detected || detected === state.mode) {
-            state.lastAutoMode = detected || state.lastAutoMode;
-            return null;
+          return best;
+        }
+
+        // Auto-detect pipeline: every parsed entry is classified on its own and
+        // converted with the matching converter, so mixed-format pastes and
+        // multi-file imports convert in a single pass instead of forcing all
+        // entries through one mode.
+        function convertAutoTexts(texts) {
+          const converted = [];
+          const skipped = [];
+          const warnings = [];
+          const modeCounts = new Map();
+          const now = new Date();
+          const bumpMode = (mode) => modeCounts.set(mode, (modeCounts.get(mode) || 0) + 1);
+
+          for (const source of texts) {
+            const parsed = bridge.parseInputText(source.text, source.name);
+            for (const error of parsed.errors) {
+              skipped.push({ sourceName: error.source, path: "$", reason: `JSON 解析失败：${error.reason}` });
+            }
+            if (!parsed.entries.length && !parsed.errors.length) {
+              skipped.push({ sourceName: source.name, path: "$", reason: "未找到可转换的 JSON 对象" });
+            }
+
+            for (const entry of parsed.entries) {
+              let mode = bridge.classifyEntryMode(entry.value);
+              let sessionSources = mode === "session"
+                ? collectSessionLikeObjects(entry.value, entry.name)
+                : null;
+              if (!mode) {
+                // Last resort for unrecognized documents: search nested
+                // session-like objects before giving up.
+                sessionSources = collectSessionLikeObjects(entry.value, entry.name);
+                if (sessionSources.length) mode = "session";
+              }
+              if (!mode) {
+                skipped.push({ sourceName: entry.name, path: "$", reason: "无法自动识别输入格式" });
+                continue;
+              }
+              bumpMode(mode);
+
+              if (mode === "session") {
+                if (!sessionSources?.length) {
+                  skipped.push({
+                    sourceName: entry.name,
+                    path: "$",
+                    reason: "未找到包含 accessToken 和 user/email 的 session 对象",
+                  });
+                  continue;
+                }
+                for (const item of sessionSources) {
+                  try {
+                    const result = convertSession(item.value, {
+                      now,
+                      sourceName: item.sourceName,
+                      sourcePath: item.path,
+                    });
+                    converted.push(result);
+                    for (const warning of result.warnings || []) {
+                      warnings.push({ sourceName: item.sourceName, path: item.path, reason: warning });
+                    }
+                  } catch (error) {
+                    skipped.push({
+                      sourceName: item.sourceName,
+                      path: item.path,
+                      reason: error instanceof Error ? error.message : "无法转换",
+                    });
+                  }
+                }
+                continue;
+              }
+
+              const bridgeResult = bridge.convertBridgeFiles(
+                [{ name: entry.name, text: JSON.stringify(entry.value) }],
+                mode,
+              );
+              converted.push(...(bridgeResult.converted || []));
+              skipped.push(...(bridgeResult.skipped || []));
+            }
           }
-          state.mode = detected;
-          if (detected === "cpa-to-sub") state.format = "sub2api";
-          if (detected === "sub-to-cpa") state.format = "cpa";
-          state.lastAutoMode = detected;
-          updateModeChrome();
-          return detected;
+
+          return {
+            converted,
+            skipped,
+            warnings,
+            dominantMode: pickDominantMode(modeCounts),
+            detectedModes: [...modeCounts.keys()],
+          };
+        }
+
+        function commitConvertedResult(result) {
+          state.converted = result.converted;
+          state.skipped = result.skipped;
+          state.warnings = result.warnings || [];
+          state.sessions = [];
+          if (result.dominantMode && result.dominantMode !== state.mode) {
+            state.mode = result.dominantMode;
+            if (result.dominantMode === "cpa-to-sub") state.format = "sub2api";
+            if (result.dominantMode === "sub-to-cpa") state.format = "cpa";
+            updateModeChrome();
+          }
+          if (state.mode === "session") {
+            clearBridgeArtifacts();
+            refreshSub2apiSplitFiles();
+          } else {
+            rebuildBridgeArtifactsFromConverted();
+          }
+          resetLiveChecks();
+          updateOutput();
         }
 
         function convertFromText(text) {
@@ -1183,44 +1356,11 @@
             return;
           }
 
-          const sources = parseInputDocuments(text);
-          const converted = [];
-          const skipped = [];
-          const warnings = [];
-          const now = new Date();
-
-          sources.forEach((item, index) => {
-            try {
-              const result = convertSession(item.value, {
-                now,
-                sourceName: item.sourceName,
-                sourcePath: item.path || `$[${index}]`,
-              });
-              converted.push(result);
-              for (const warning of result.warnings || []) {
-                warnings.push({ sourceName: item.sourceName, path: item.path, reason: warning });
-              }
-            } catch (error) {
-              skipped.push({
-                sourceName: item.sourceName,
-                path: item.path,
-                reason: error instanceof Error ? error.message : "无法转换",
-              });
-            }
-          });
-
-          if (!sources.length) {
-            skipped.push({
-              sourceName: "pasted-json",
-              path: "$",
-              reason: "未找到包含 accessToken 和 user/email 的 session 对象",
-            });
-          }
-
-          state.converted = converted;
-          state.skipped = skipped;
-          state.warnings = warnings;
-          state.sessions = sources;
+          const result = convertSessionText(text, "pasted-json");
+          state.converted = result.converted;
+          state.skipped = result.skipped;
+          state.warnings = result.warnings;
+          state.sessions = result.sources;
           clearBridgeArtifacts();
           refreshSub2apiSplitFiles();
           resetLiveChecks();
@@ -1758,9 +1898,12 @@
           }
 
           if (state.mode === "session") {
-            const unsupportedCount = state.converted.length - itemsForSessionFormat(state.converted, state.format).length;
-            const unsupportedNote = unsupportedCount
-              ? `已跳过 ${unsupportedCount} 个 Agent Identity 账号：该格式无对应字段，仅 sub2api 支持。`
+            const supportedItems = itemsForSessionFormat(state.converted, state.format);
+            const droppedItems = state.converted.filter((item) => !supportedItems.includes(item));
+            const unsupportedNote = droppedItems.length
+              ? (droppedItems.every((item) => item.agentIdentity)
+                ? `已跳过 ${droppedItems.length} 个 Agent Identity 账号：该格式无对应字段，仅 sub2api 支持。`
+                : `已跳过 ${droppedItems.length} 个账号：该格式无对应输出字段。`)
               : "";
             elements.statFormat.textContent = OUTPUT_LABELS[state.format];
             elements.outputSubtitle.textContent = (canSplitSub2api && state.format === "sub2api"
@@ -1769,17 +1912,21 @@
             elements.downloadOutput.textContent = "下载 JSON";
             elements.cpaNotice.style.display = ["cpa", "cockpit", "codex", "axonhub", "codexmanager"].includes(state.format) ? "block" : "none";
           } else if (state.mode === "cpa-to-sub") {
+            const droppedCount = state.converted.length - state.converted.filter((item) => item.sub2apiAccount).length;
+            const droppedNote = droppedCount ? ` 另有 ${droppedCount} 个账号无对应输出字段，未包含在导出中。` : "";
             elements.statFormat.textContent = "sub2api";
-            elements.outputSubtitle.textContent = canSplitSub2api
+            elements.outputSubtitle.textContent = (canSplitSub2api
               ? `当前输出为合并 sub2api-data；可用「拆分 ZIP」按账号导出 ${state.sub2apiFiles.length} 个导入文件。`
-              : "当前输出为 sub2api-data 导入 JSON。";
+              : "当前输出为 sub2api-data 导入 JSON。") + droppedNote;
             elements.downloadOutput.textContent = "下载 JSON";
             elements.cpaNotice.style.display = "none";
           } else {
+            const droppedCount = state.converted.length - state.converted.filter((item) => item.cpa).length;
+            const droppedNote = droppedCount ? ` 另有 ${droppedCount} 个账号无对应输出字段，未包含在导出中。` : "";
             elements.statFormat.textContent = "CPA";
-            elements.outputSubtitle.textContent = splitDetails?.kind === "cpa"
+            elements.outputSubtitle.textContent = (splitDetails?.kind === "cpa"
               ? `当前输出为包含 ${state.cpaFiles.length} 个账号的合并 JSON；也可选择「拆分 ZIP」导出原生 auth 文件。`
-              : "当前输出为单个 CLIProxyAPI auth JSON。";
+              : "当前输出为单个 CLIProxyAPI auth JSON。") + droppedNote;
             elements.downloadOutput.textContent = "下载 JSON";
             elements.cpaNotice.style.display = "block";
           }
@@ -1838,7 +1985,6 @@
             state.skipped = [];
             state.warnings = [];
             state.sessions = [];
-            state.lastAutoMode = null;
             clearBridgeArtifacts();
             resetLiveChecks();
             updateOutput();
@@ -1847,19 +1993,33 @@
           }
 
           try {
-            const autoSwitched = maybeAutoDetectMode(text);
+            if (state.autoDetectMode) {
+              const result = convertAutoTexts([{ name: "pasted-json", text }]);
+              commitConvertedResult(result);
+              if (state.converted.length) {
+                const autoNote = result.detectedModes.length > 1
+                  ? `已自动识别 ${result.detectedModes.length} 种输入格式。`
+                  : `已自动识别为「${MODE_LABELS[result.dominantMode]}」。`;
+                setStatus(
+                  elements.inputStatus,
+                  `${autoNote}解析完成：${state.converted.length} 个账号，跳过 ${state.skipped.length} 项。`.trim(),
+                  "ok",
+                );
+              } else {
+                setStatus(elements.inputStatus, parseErrorReason(state.skipped) || "没有可转换账号。", "error");
+              }
+              return;
+            }
+
             convertFromText(text);
             if (state.converted.length) {
-              const autoNote = autoSwitched
-                ? `已自动识别为「${MODE_LABELS[autoSwitched]}」。`
-                : "";
               setStatus(
                 elements.inputStatus,
-                `${autoNote}解析完成：${state.converted.length} 个账号，跳过 ${state.skipped.length} 项。`.trim(),
+                `解析完成：${state.converted.length} 个账号，跳过 ${state.skipped.length} 项。`.trim(),
                 "ok",
               );
             } else {
-              setStatus(elements.inputStatus, "没有可转换账号。", "error");
+              setStatus(elements.inputStatus, parseErrorReason(state.skipped) || "没有可转换账号。", "error");
             }
           } catch (error) {
             state.converted = [];
@@ -1874,6 +2034,11 @@
             updateOutput();
             setStatus(elements.inputStatus, error instanceof Error ? error.message : "JSON 解析失败", "error");
           }
+        }
+
+        function parseErrorReason(skipped) {
+          const entry = (skipped || []).find((item) => String(item.reason).startsWith("JSON 解析失败"));
+          return entry ? entry.reason : null;
         }
 
         async function downloadBlob(blob, fileName) {
@@ -1977,11 +2142,17 @@
             ? payloads[0].text
             : payloads.map((item) => item.text).join("\n");
           elements.input.value = joinedText;
-          const autoSwitched = maybeAutoDetectMode(joinedText);
 
-          if (state.mode !== "session") {
-            applyBridgeResult(bridge.convertBridgeFiles(payloads, state.mode));
-            const autoNote = autoSwitched ? `已自动识别为「${MODE_LABELS[autoSwitched]}」。` : "";
+          if (state.autoDetectMode) {
+            // Each file is parsed and converted with its own recognized
+            // format; mixed batches merge into one result list.
+            const result = convertAutoTexts(payloads);
+            commitConvertedResult(result);
+            const autoNote = result.detectedModes.length > 1
+              ? `已自动识别 ${result.detectedModes.length} 种输入格式。`
+              : result.dominantMode
+                ? `已自动识别为「${MODE_LABELS[result.dominantMode]}」。`
+                : "";
             setStatus(
               elements.inputStatus,
               `${autoNote}读取 ${jsonFiles.length} 个文件，生成 ${state.converted.length} 个账号，跳过 ${state.skipped.length} 项。`.trim(),
@@ -1990,29 +2161,29 @@
             return;
           }
 
+          if (state.mode !== "session") {
+            applyBridgeResult(bridge.convertBridgeFiles(payloads, state.mode));
+            setStatus(
+              elements.inputStatus,
+              `读取 ${jsonFiles.length} 个文件，生成 ${state.converted.length} 个账号，跳过 ${state.skipped.length} 项。`.trim(),
+              state.converted.length ? "ok" : "error",
+            );
+            return;
+          }
+
           const documents = [];
           const skipped = [];
-
-          for (const file of jsonFiles) {
-            try {
-              const text = await file.text();
-              const parsed = JSON.parse(text);
-              const found = collectSessionLikeObjects(parsed, file.webkitRelativePath || file.name);
-              if (!found.length) {
-                skipped.push({
-                  sourceName: file.webkitRelativePath || file.name,
-                  path: "$",
-                  reason: "未找到包含 accessToken 和 user/email 的 session 对象",
-                });
-              }
-              documents.push(...found);
-            } catch (error) {
+          for (const payload of payloads) {
+            const { sources, errors } = parseInputDocuments(payload.text, payload.name);
+            if (!sources.length && !errors.length) {
               skipped.push({
-                sourceName: file.webkitRelativePath || file.name,
+                sourceName: payload.name,
                 path: "$",
-                reason: error instanceof Error ? error.message : "无法读取文件",
+                reason: "未找到包含 accessToken 和 user/email 的 session 对象",
               });
             }
+            skipped.push(...errors);
+            documents.push(...sources);
           }
 
           const now = new Date();
