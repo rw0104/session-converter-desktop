@@ -7,15 +7,19 @@ const root = process.cwd();
 const read = (...parts) => readFile(join(root, ...parts), 'utf8');
 
 test('desktop page is standalone and exposes intentional resource links', async () => {
-  const [html, main] = await Promise.all([
+  const [html, main, packageSource] = await Promise.all([
     read('src', 'index.html'),
     read('src-tauri', 'src', 'main.rs'),
+    read('package.json'),
   ]);
+  const version = JSON.parse(packageSource).version;
+  const versionPattern = version.replaceAll('.', '\\.');
 
   assert.match(html, /Session Converter/);
   assert.doesNotMatch(html, /系统 WebView \+ Rust|Tauri 2\.11|runtime-summary/);
-  assert.match(html, /src="\.\/bridge\.js\?v=0\.1\.6"/);
-  assert.match(html, /src="\.\/converter\.js\?v=0\.1\.6"/);
+  assert.match(html, new RegExp(`src="\\.\\/bridge\\.js\\?v=${versionPattern}"`));
+  assert.match(html, new RegExp(`src="\\.\\/converter\\.js\\?v=${versionPattern}"`));
+  assert.match(html, new RegExp(`当前 v${versionPattern}`));
   assert.match(html, /id="check-app-update"/);
   assert.match(html, /id="check-upstream-updates"/);
   assert.match(html, /id="live-check-model"/);
@@ -36,11 +40,12 @@ test('desktop page is standalone and exposes intentional resource links', async 
 });
 
 test('conversion remains local and desktop-only capabilities are explicit', async () => {
-  const [converter, bridge, config, capability] = await Promise.all([
+  const [converter, bridge, config, capability, packageSource] = await Promise.all([
     read('src', 'converter.js'),
     read('src', 'bridge.js'),
     read('src-tauri', 'tauri.conf.json'),
     read('src-tauri', 'capabilities', 'default.json'),
+    read('package.json'),
   ]);
 
   assert.match(converter, /probe_chatgpt_workspace/);
@@ -54,6 +59,8 @@ test('conversion remains local and desktop-only capabilities are explicit', asyn
   assert.doesNotMatch(bridge, /fetch\s*\(|localStorage|sessionStorage|indexedDB|document\.cookie|sendBeacon|WebSocket|XMLHttpRequest/i);
 
   const parsedConfig = JSON.parse(config);
+  const packageVersion = JSON.parse(packageSource).version;
+  assert.equal(parsedConfig.version, packageVersion);
   assert.equal(parsedConfig.app.withGlobalTauri, true);
   assert.equal(parsedConfig.bundle.createUpdaterArtifacts, true);
   assert.match(parsedConfig.plugins.updater.pubkey, /^dW50cnVzdGVk/);

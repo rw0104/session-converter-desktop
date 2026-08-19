@@ -52,7 +52,7 @@ jobs:
         with:
           tagName: v__VERSION__
           releaseName: Session Converter v__VERSION__
-          releaseBody: Signed cross-platform desktop installers. Version 0.1.6 auto-detects the format of every imported entry (mixed Session / CPA / sub2api batches convert in one pass), fixes manual mode-switch parsing and keeps downloads converted-only, and removes the account purchase entry.
+          releaseBody: Signed cross-platform desktop installers. Version 0.1.7 includes the reviewed CLIProxyAPI and sub2api audit pins, keeps the mixed-format conversion and converted-only downloads from 0.1.6, and hardens scheduled audit refreshes so metadata changes are tested before publishing.
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}

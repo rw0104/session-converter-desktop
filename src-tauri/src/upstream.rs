@@ -248,7 +248,7 @@ pub async fn check_upstream_updates() -> Vec<UpstreamCheck> {
         let commit_response = match client
             .get(commit_url)
             .header(ACCEPT, "application/vnd.github+json")
-            .header(USER_AGENT, "session-converter-desktop/0.1.5")
+            .header(USER_AGENT, "session-converter-desktop/0.1.7")
             .send()
             .await
         {
@@ -292,7 +292,7 @@ pub async fn check_upstream_updates() -> Vec<UpstreamCheck> {
         let tree_response = match client
             .get(tree_url)
             .header(ACCEPT, "application/vnd.github+json")
-            .header(USER_AGENT, "session-converter-desktop/0.1.5")
+            .header(USER_AGENT, "session-converter-desktop/0.1.7")
             .send()
             .await
         {
