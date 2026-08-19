@@ -109,14 +109,17 @@ test('upstream and external-link commands only use fixed destinations', async ()
 });
 
 test('upstream schema pins and license provenance travel with the extraction', async () => {
-  const [bridge, upstream, license] = await Promise.all([
+  const [bridge, upstream, license, auditSource] = await Promise.all([
     read('src', 'bridge.js'),
     read('docs', 'UPSTREAM.md'),
     read('LICENSE'),
+    read('config', 'upstream-audit.json'),
   ]);
+  const audit = JSON.parse(auditSource);
 
-  assert.match(bridge, /78f0c4079e3e6273d65d03b5549cffc898703264/);
-  assert.match(bridge, /c204d33b09ebfefe96c1d4dcb16a88590992257e/);
+  for (const spec of audit.upstreams) {
+    assert.match(bridge, new RegExp(spec.auditedCommit));
+  }
   assert.match(upstream, /gtxx3600\/GPTSession2CPAandSub2API/);
   assert.match(license, /MIT License/);
   assert.match(license, /Dehujiaogeli/);

@@ -1088,23 +1088,27 @@ function testSub2apiSplitZipBuildsMultipleFiles() {
 function testSourcePinsMatchHeaderBadges() {
   const { context } = loadPageScript();
   const pins = context.SessionConverterBridge.SOURCE_PINS;
-  assert.equal(pins.length, 2);
-  assert.equal(pins[0].label, "CLIProxyAPI");
-  assert.equal(pins[0].branch, "main");
-  assert.equal(pins[0].shortSha, "78f0c407");
-  assert.equal(pins[0].date, "2026-08-14");
-  assert.match(pins[0].commitUrl, /78f0c4079e3e6273d65d03b5549cffc898703264/);
-  assert.equal(pins[1].label, "sub2api");
-  assert.equal(pins[1].shortSha, "c204d33b");
-  assert.equal(pins[1].date, "2026-08-15");
-  assert.equal(
-    context.SessionConverterBridge.formatSourcePinLabel(pins[0]),
-    "CLIProxyAPI · 78f0c407",
-  );
-  assert.equal(
-    context.SessionConverterBridge.formatSourcePinLabel(pins[1]),
-    "sub2api · c204d33b",
-  );
+  const audit = JSON.parse(fs.readFileSync(
+    path.join(__dirname, "..", "config", "upstream-audit.json"),
+    "utf8",
+  ));
+
+  assert.equal(pins.length, audit.upstreams.length);
+  for (const [index, spec] of audit.upstreams.entries()) {
+    const pin = pins[index];
+    assert.equal(pin.id, spec.id);
+    assert.equal(pin.label, spec.label);
+    assert.equal(pin.branch, spec.branch);
+    assert.equal(pin.shortSha, spec.auditedCommit.slice(0, 8));
+    assert.equal(pin.fullSha, spec.auditedCommit);
+    assert.equal(pin.date, spec.auditedDate);
+    assert.equal(pin.repoUrl, `https://github.com/${spec.repository}`);
+    assert.equal(pin.commitUrl, `https://github.com/${spec.repository}/commit/${spec.auditedCommit}`);
+    assert.equal(
+      context.SessionConverterBridge.formatSourcePinLabel(pin),
+      `${spec.label} · ${spec.auditedCommit.slice(0, 8)}`,
+    );
+  }
 }
 
 function testBridgeRoundTripCodexAccount() {

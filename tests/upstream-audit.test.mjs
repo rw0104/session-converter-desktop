@@ -47,3 +47,12 @@ test('generated browser badges are sourced from audit metadata', async () => {
   const updated = updateBridgePins(bridge, audit);
   assert.match(updated, /owner\/repo\/commit\/aaaaaaaa/);
 });
+
+test('checked-in browser badges exactly match the current audit configuration', async () => {
+  const [auditSource, bridge] = await Promise.all([
+    readFile(new URL('../config/upstream-audit.json', import.meta.url), 'utf8'),
+    readFile(new URL('../src/bridge.js', import.meta.url), 'utf8'),
+  ]);
+  const audit = JSON.parse(auditSource);
+  assert.equal(updateBridgePins(bridge, audit), bridge);
+});

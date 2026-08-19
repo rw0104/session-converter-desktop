@@ -28,6 +28,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node scripts/check-upstreams.mjs --write --github
+      - name: Verify generated audit metadata
+        if: steps.audit.outputs.metadata_changed == 'true'
+        run: npm run test:core
       - name: Commit metadata-only audit refresh
         if: steps.audit.outputs.metadata_changed == 'true'
         run: |
