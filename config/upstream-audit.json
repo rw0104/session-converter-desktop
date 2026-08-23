@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-22",
+  "updatedAt": "2026-08-23",
   "upstreams": [
     {
       "id": "cliproxyapi",
@@ -33,8 +33,8 @@
       "label": "sub2api",
       "repository": "Wei-Shaw/sub2api",
       "branch": "main",
-      "auditedCommit": "67380eafd5ae2eaa8db910ae738199c3dac62e37",
-      "auditedDate": "2026-08-21",
+      "auditedCommit": "d45135d87df16d48637f04ccd245727bc955ba54",
+      "auditedDate": "2026-08-22",
       "files": [
         {
           "path": "backend/internal/handler/admin/account_codex_import.go",
