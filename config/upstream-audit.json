@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-26",
+  "updatedAt": "2026-08-27",
   "upstreams": [
     {
       "id": "cliproxyapi",
@@ -33,7 +33,7 @@
       "label": "sub2api",
       "repository": "Wei-Shaw/sub2api",
       "branch": "main",
-      "auditedCommit": "6ca1e15b0ad2455b6df16535023be754fe087ea7",
+      "auditedCommit": "efb46db0a960fdad94502b1c3a982a0051cf5245",
       "auditedDate": "2026-08-26",
       "files": [
         {
