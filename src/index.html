@@ -8,7 +8,7 @@
     <title>Session Converter · 凭证格式转换</title>
     <meta name="theme-color" content="#f5f5f7" />
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" sizes="any" />
-    <link rel="stylesheet" href="./styles.css?v=0.1.8" />
+    <link rel="stylesheet" href="./styles.css?v=0.1.9" />
   </head>
   <body>
     <main class="app">
@@ -49,7 +49,7 @@
             <div class="update-status-row">
               <div class="source-note-copy">
                 <strong>软件更新</strong>
-                <span id="app-update-status" role="status" aria-live="polite">当前 v0.1.8；仅安装本仓库发布的签名版本。</span>
+                <span id="app-update-status" role="status" aria-live="polite">当前 v0.1.9；仅安装本仓库发布的签名版本。</span>
               </div>
               <button class="button button-secondary update-status-button" id="check-app-update" type="button">检查软件</button>
             </div>
@@ -197,8 +197,8 @@
                 <label class="live-check-control live-check-model-control" for="live-check-model">
                   <span>模型</span>
                   <select id="live-check-model" aria-describedby="live-check-model-help">
-                    <option value="sol" selected>sol（默认）</option>
-                    <option value="auto">自动匹配（Free 推荐）</option>
+                    <option value="auto" selected>自动匹配（推荐）</option>
+                    <option value="sol">sol</option>
                     <option value="custom">其他模型…</option>
                   </select>
                 </label>
@@ -216,7 +216,7 @@
                 </div>
               </div>
               <p class="live-check-note" id="live-check-model-help">
-                默认检测 <code>sol</code>；Free 账号可选择“自动匹配”，由 Rust 先读取该账号实际可见模型再发起一次最小请求。账号没有所选模型只会标为“不支持该模型”，不会被清理。access token 仅存在于本次请求内存；JWT 过期及 HTTP 401、402、403 可清理，429、5xx、超时与网络错误均保留。
+                默认使用“自动匹配”，由 Rust 分别读取每个账号实际可见的模型，再选择一个模型发起最小请求。也可手动指定 <code>sol</code> 或其他模型；账号没有所选模型只会标为“不支持该模型”，不会被清理。access token 仅存在于本次请求内存；JWT 过期及 HTTP 401、402、403 可清理，429、5xx、超时与网络错误均保留。
               </p>
               <div class="live-check-table">
                 <table>
@@ -276,7 +276,7 @@
       </footer>
     </main>
 
-    <script src="./bridge.js?v=0.1.8"></script>
-    <script src="./converter.js?v=0.1.8"></script>
+    <script src="./bridge.js?v=0.1.9"></script>
+    <script src="./converter.js?v=0.1.9"></script>
   </body>
 </html>

@@ -1692,7 +1692,7 @@
         async function runLiveCheck() {
           if (state.liveChecking || !state.converted.length) return;
 
-          const modelChoice = String(elements.liveCheckModel?.value || "sol").trim();
+          const modelChoice = String(elements.liveCheckModel?.value || "auto").trim();
           const requestedModel = modelChoice === "custom"
             ? String(elements.liveCheckCustomModel?.value || "").trim()
             : modelChoice;

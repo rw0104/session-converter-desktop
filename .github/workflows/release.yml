@@ -52,7 +52,17 @@ jobs:
         with:
           tagName: v__VERSION__
           releaseName: Session Converter v__VERSION__
-          releaseBody: Signed cross-platform desktop installers. Version 0.1.8 advances the reviewed CLIProxyAPI and sub2api audit pins. The upstream Codex executor now clears stale Authorization headers for empty credentials and centralizes API-key detection; the desktop converter and direct probe require non-empty access tokens, so their mapping and request protocol remain unchanged. Scheduled audits now reuse one open review issue per upstream.
+          releaseBody: |
+            ## v0.1.9 紧急修复
+
+            本次更新修复“实际模型检测”默认无法完成的问题。
+
+            - 默认检测改为“自动匹配”，会读取每个账号实际可见的模型后再发起最小请求。
+            - 修复默认硬编码 sol 时，部分账号只显示“不支持该模型”而没有真正执行检测的问题。
+            - 仍可手动选择 sol 或输入其他模型名称。
+            - 不改变账号转换结果、清理规则或本地隐私保护方式。
+
+            建议所有 v0.1.8 及更早版本用户尽快升级。
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}

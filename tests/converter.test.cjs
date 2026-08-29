@@ -794,6 +794,39 @@ async function testUnavailableSelectedModelDoesNotRemoveFreeAccount() {
   assert.match(elements.get("#output").value, /free@example\.com/);
 }
 
+async function testDefaultLiveCheckUsesAutomaticVisibleModel() {
+  const calls = [];
+  const { elements } = loadPageScript({
+    tauri: {
+      core: {
+        async invoke(command, args) {
+          if (command !== "probe_chatgpt_workspace") throw new Error(`unexpected command: ${command}`);
+          calls.push(args);
+          return {
+            status: 200,
+            available: true,
+            stage: "response",
+            code: "ok",
+            model: "gpt-free-model",
+            availableModels: ["gpt-free-model"],
+          };
+        },
+      },
+    },
+  });
+  const input = elements.get("#session-input");
+  input.value = JSON.stringify({
+    user: { email: "default@example.com" },
+    accessToken: jwtWithPayload({ exp: 4102444800 }),
+  });
+  dispatch(input, "input");
+  await dispatchAsync(elements.get("#live-check-button"), "click");
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].requestedModel, "auto");
+  assert.match(elements.get("#live-check-body").innerHTML, /gpt-free-model/);
+}
+
 async function testLiveCheckRejectsWorkspaceDeniedAccounts() {
   const calls = [];
   const { elements } = loadPageScript({
@@ -1611,6 +1644,7 @@ async function main() {
   await testAgentIdentityNeverReachesTheProbeRelay();
   await testLiveCheckOnlyRemovesConfirmedUnauthorizedAccounts();
   await testLiveCheckKeepsRateLimitedAccounts();
+  await testDefaultLiveCheckUsesAutomaticVisibleModel();
   await testUnavailableSelectedModelDoesNotRemoveFreeAccount();
   await testLiveCheckRejectsWorkspaceDeniedAccounts();
   await testExpiredJwtIsClassifiedLocallyWithoutNetworkRequest();

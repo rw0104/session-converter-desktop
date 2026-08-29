@@ -23,8 +23,8 @@ test('desktop page is standalone and exposes intentional resource links', async 
   assert.match(html, /id="check-app-update"/);
   assert.match(html, /id="check-upstream-updates"/);
   assert.match(html, /id="live-check-model"/);
-  assert.match(html, /sol（默认）/);
-  assert.match(html, /自动匹配（Free 推荐）/);
+  assert.match(html, /<option value="auto" selected>自动匹配（推荐）<\/option>/);
+  assert.doesNotMatch(html, /<option value="sol" selected>/);
   assert.match(html, /id="file-drop-zone"/);
   assert.match(html, /拖入 JSON 即可转换/);
   assert.match(html, /部分响应还含 <code>sessionToken<\/code>/);
