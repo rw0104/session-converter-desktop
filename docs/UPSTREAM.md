@@ -11,8 +11,8 @@
 
 | 目标格式 | 源仓库 | 钉死提交 | 日期 | 核心依据 |
 | --- | --- | --- | --- | --- |
-| CPA / Codex 模型检测 | [router-for-me/CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) | `497673bf6bdab783b767641bb5228e914960a879`（短：`497673bf`） | 2026-08-18 | `internal/auth/codex/token.go`、`jwt_parser.go`、`cmd/fetch_codex_models/main.go`、`internal/runtime/executor/codex_executor_request.go` |
-| sub2api | [Wei-Shaw/sub2api](https://github.com/Wei-Shaw/sub2api) | `c6f4fbde49fa0d45ec2838327a657c03889f4287`（短：`c6f4fbde`） | 2026-08-19 | `backend/internal/handler/admin/account_codex_import.go`、`backend/internal/pkg/openai/oauth.go`（`ClientID`） |
+| CPA / Codex 模型检测 | [router-for-me/CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) | `f0de1d008fe8881dcb7431cf97b147295874c2b2`（短：`f0de1d00`） | 2026-08-28 | `internal/auth/codex/token.go`、`jwt_parser.go`、`cmd/fetch_codex_models/main.go`、`internal/runtime/executor/codex_executor_request.go` |
+| sub2api | [Wei-Shaw/sub2api](https://github.com/Wei-Shaw/sub2api) | `b5827cfd54d58c248a9480b800444d0b40f0c6ea`（短：`b5827cfd`） | 2026-08-29 | `backend/internal/handler/admin/account_codex_import.go`、`backend/internal/pkg/openai/oauth.go`（`ClientID`） |
 
 页面顶部将「软件更新」和「算法映射状态」分开。软件更新只读取本仓库签名 Release；算法检测读取 `config/upstream-audit.json`，比较上表 6 个真正相关文件在上游 `main` 树中的 Git blob SHA，不再用整个仓库 HEAD 判断算法变化。算法上游源码不会被下载或执行。
 
@@ -86,5 +86,6 @@ Agent Identity 行为要点（对齐 `2730c1c4`）：
 - 2026-08-08：原始 Session 转换上游仍为 `a097eb15`，没有新提交。本项目继续以 access JWT `exp` 为 token 到期依据，`sessionToken` 为可选字段，Session Cookie `expires` 只存入 `extra.session_expires_at`。
 - 2026-08-14：CLIProxyAPI 推进到 `78f0c407` 并复核。`token.go` 仅为重构（logrus 导入、`MergeMetadata` 调用提前、Close 错误日志），`CodexTokenStorage` schema 无任何字段变化；`codex_executor_request.go` 将代理层头部 `Session_id` 改名 `Session-Id`（HTTP 头大小写不敏感，与本机检测下发的 `session_id` 语义等价）、透传 `X-Codex-Window-Id` / `Thread-Id` / `Session-Id` / `X-Openai-Internal-Codex-Responses-Lite`（均为代理透传，非客户端默认值），并移除仅对 Mac OS UA 生效的 `Session_id` 生成特例。本机检测为直连最小实现，不实现代理的 identity-confusion / prompt-cache 层，映射与检测算法无需改动，钉值随之推进。
 - 2026-08-18：CLIProxyAPI 推进到 `497673bf` 并复核。受审计的变化仅在 `codex_executor_request.go`：代理执行器现可显式接收下游请求头，并将 auth 属性中形如 `header: "$ABC"` 的动态自定义头解析为该下游头的值。这是 CLIProxyAPI 代理配置的请求透传能力，未改动 `CodexTokenStorage` 字段、Codex 认证头或 models/responses 协议；本应用直连固定上游且不接收自定义请求头，因此转换与检测算法无需改动，仅更新审计 blob 钉。sub2api 相关两个 blob 未变，仅推进审计提交至 `c6f4fbde`。
+- 2026-08-29：CLIProxyAPI 推进到 `f0de1d00` 并复核。受审计的变化仅在 `codex_executor_request.go`：空 token 时主动删除已有 `Authorization`，并改用统一 helper 识别 API Key 认证，避免代理复用请求对象或 base-URL-only 配置时携带陈旧凭证。本应用的测活入口会在网络请求前拒绝空 access token，且不复用上游请求对象；账户 schema、Codex 身份头和 models/responses 协议均未变化，因此转换与检测算法无需改动，仅更新审计 blob 钉。sub2api 两个相关 blob 未变，仅推进审计提交至 `b5827cfd`。
 
 本地检测只筛除确认 401、402、403 或本地确认过期的转换项，不改写其余输出字段。真实模型检测会产生极少量模型用量。后续升级必须重新核对 CLIProxyAPI / sub2api 账户 schema 与官方 Codex 请求协议，并执行安全审计、上游测试和桌面应用回归测试。

@@ -82,7 +82,7 @@ async function githubJson(path, token, init = {}) {
     headers: {
       Accept: 'application/vnd.github+json',
       'X-GitHub-Api-Version': '2022-11-28',
-      'User-Agent': 'session-converter-upstream-audit/0.1.7',
+      'User-Agent': 'session-converter-upstream-audit/0.1.8',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(init.headers || {}),
     },
@@ -103,6 +103,12 @@ async function fetchSnapshot(spec, token) {
   return compareAuditToSnapshot(spec, commit, tree.tree);
 }
 
+export function findOpenAuditIssue(openIssues, result) {
+  if (!Array.isArray(openIssues) || !result?.label) return null;
+  const prefix = `Algorithm mapping review: ${result.label} `;
+  return openIssues.find((issue) => typeof issue?.title === 'string' && issue.title.startsWith(prefix)) || null;
+}
+
 async function ensureAuditIssue(repository, result, token) {
   if (!token || !repository) return;
   try {
@@ -116,25 +122,30 @@ async function ensureAuditIssue(repository, result, token) {
   }
   const title = `Algorithm mapping review: ${result.label} ${result.latestCommit.slice(0, 8)}`;
   const openIssues = await githubJson(`/repos/${repository}/issues?state=open&labels=upstream-audit&per_page=100`, token);
-  if (openIssues.some((issue) => issue.title === title)) return;
   const rows = result.changedFiles.map((file) =>
     `- \`${file.path}\`: \`${file.pinnedBlobSha || 'missing'}\` → \`${file.latestBlobSha || 'missing'}\``,
   ).join('\n');
-  await githubJson(`/repos/${repository}/issues`, token, {
-    method: 'POST',
+  const body = [
+    'The scheduled upstream audit detected changes in files that affect credential mapping or model verification.',
+    '',
+    `Upstream: https://github.com/${result.repository}/commit/${result.latestCommit}`,
+    '',
+    rows,
+    '',
+    'Do not update the embedded blob pins until the mapping diff, conversion fixtures, and live-model probe tests pass. Then publish a signed desktop release.',
+  ].join('\n');
+  const existing = findOpenAuditIssue(openIssues, result);
+  if (existing?.title === title && existing?.body === body) return;
+  const issuePath = existing?.number
+    ? `/repos/${repository}/issues/${existing.number}`
+    : `/repos/${repository}/issues`;
+  await githubJson(issuePath, token, {
+    method: existing?.number ? 'PATCH' : 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       title,
-      labels: ['upstream-audit'],
-      body: [
-        'The scheduled upstream audit detected changes in files that affect credential mapping or model verification.',
-        '',
-        `Upstream: https://github.com/${result.repository}/commit/${result.latestCommit}`,
-        '',
-        rows,
-        '',
-        'Do not update the embedded blob pins until the mapping diff, conversion fixtures, and live-model probe tests pass. Then publish a signed desktop release.',
-      ].join('\n'),
+      ...(existing?.number ? {} : { labels: ['upstream-audit'] }),
+      body,
     }),
   });
 }

@@ -52,7 +52,7 @@ jobs:
         with:
           tagName: v__VERSION__
           releaseName: Session Converter v__VERSION__
-          releaseBody: Signed cross-platform desktop installers. Version 0.1.7 includes the reviewed CLIProxyAPI and sub2api audit pins, keeps the mixed-format conversion and converted-only downloads from 0.1.6, and hardens scheduled audit refreshes so metadata changes are tested before publishing.
+          releaseBody: Signed cross-platform desktop installers. Version 0.1.8 advances the reviewed CLIProxyAPI and sub2api audit pins. The upstream Codex executor now clears stale Authorization headers for empty credentials and centralizes API-key detection; the desktop converter and direct probe require non-empty access tokens, so their mapping and request protocol remain unchanged. Scheduled audits now reuse one open review issue per upstream.
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}

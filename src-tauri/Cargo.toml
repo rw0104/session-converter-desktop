@@ -1,6 +1,6 @@
 [package]
 name = "session-converter-desktop"
-version = "0.1.7"
+version = "0.1.8"
 description = "Local-first desktop credential format converter"
 authors = ["Session Converter contributors"]
 edition = "2021"

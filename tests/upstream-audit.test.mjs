@@ -1,7 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { compareAuditToSnapshot, renderSourcePinsBlock, updateBridgePins } from '../scripts/check-upstreams.mjs';
+import {
+  compareAuditToSnapshot,
+  findOpenAuditIssue,
+  renderSourcePinsBlock,
+  updateBridgePins,
+} from '../scripts/check-upstreams.mjs';
 
 const sha = (character) => character.repeat(40);
 const spec = {
@@ -37,6 +42,16 @@ test('changed and missing relevant blobs require an algorithm review', () => {
   ]);
   assert.equal(result.status, 'algorithm_changed');
   assert.deepEqual(result.changedFiles.map((file) => file.status), ['changed', 'missing']);
+});
+
+test('an existing open review is reused when the same upstream HEAD advances', () => {
+  const result = { label: 'CLIProxyAPI' };
+  const issues = [
+    { number: 7, title: 'Algorithm mapping review: CLIProxyAPI 0a14eb70' },
+    { number: 8, title: 'Algorithm mapping review: sub2api abcdef12' },
+  ];
+  assert.equal(findOpenAuditIssue(issues, result)?.number, 7);
+  assert.equal(findOpenAuditIssue(issues, { label: 'Another upstream' }), null);
 });
 
 test('generated browser badges are sourced from audit metadata', async () => {
