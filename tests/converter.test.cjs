@@ -197,6 +197,18 @@ async function testDroppedJsonConvertsImmediately() {
   assert.match(elements.get("#input-status").textContent, /读取 1 个文件/);
 }
 
+function testWebRuntimeUsesBrowserOnlyChrome() {
+  const { elements, context } = loadPageScript();
+
+  assert.equal(context.document.body.classList.contains("web-runtime"), true);
+  assert.equal(elements.get("#desktop-live-check").hidden, true);
+  assert.equal(elements.get("#desktop-update-controls").hidden, true);
+  assert.equal(elements.get("#runtime-health-meta").hidden, true);
+  assert.equal(elements.get("#runtime-status-label").textContent, "浏览器本地");
+  assert.equal(elements.get("#runtime-local-meta").textContent, "浏览器本地解析");
+  assert.match(elements.get("#runtime-footer-copy").textContent, /桌面版/);
+}
+
 async function testDesktopUpstreamCheckReportsAuditedPins() {
   const calls = [];
   const { elements } = loadPageScript({
@@ -1610,6 +1622,7 @@ async function testDownloadsContainConvertedContentOnly() {
 async function main() {
   await testDesktopExternalLinksUseRustAllowlistedCommand();
   await testDroppedJsonConvertsImmediately();
+  testWebRuntimeUsesBrowserOnlyChrome();
   await testDesktopUpstreamCheckReportsAuditedPins();
   await testSignedAppUpdateRequiresConfirmationThenInstalls();
   testSub2apiAccountUsesAccessTokenExpiry();

@@ -42,6 +42,14 @@ npm run build
 
 产物位于 `target/release/bundle/`。推送 `v*` 标签后，GitHub Actions 会创建正式 Release，并附带 Windows、macOS、Linux 安装包与 Tauri 签名更新清单。
 
+## Web 版（GitHub Pages）
+
+推送 `main` 会触发 `.github/workflows/pages.yml`，将 `src/` 中的静态 HTML、CSS 和 JavaScript 发布到 GitHub Pages。首次启用时，在仓库 `Settings → Pages → Build and deployment → Source` 选择 `GitHub Actions`。
+
+Web 版保留浏览器本地的 JSON 读取、格式转换、复制、JSON/ZIP 下载能力；输入不会上传，也不会写入浏览器存储。实际模型检测、软件自动更新和上游算法检查依赖 Tauri/Rust，仅在桌面版提供。需要这些能力时请使用对应平台的桌面安装包。
+
+默认项目站点地址为 `https://<owner>.github.io/session-converter-desktop/`；仓库使用相对资源路径，因此无需为项目站点额外配置前端 base path。
+
 ## 安全边界
 
 - 转换数据只存在于当前窗口内存；关闭或刷新应用后不会恢复。

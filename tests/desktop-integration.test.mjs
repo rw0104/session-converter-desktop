@@ -74,6 +74,19 @@ test('conversion remains local and desktop-only capabilities are explicit', asyn
   assert.deepEqual(parsedCapability.permissions, ['core:default']);
 });
 
+test('GitHub Pages workflow publishes the static converter surface', async () => {
+  const workflow = await read('.github', 'workflows', 'pages.yml');
+
+  assert.match(workflow, /branches:\s*\[main\]/);
+  assert.match(workflow, /contents:\s*read/);
+  assert.match(workflow, /pages:\s*write/);
+  assert.match(workflow, /id-token:\s*write/);
+  assert.match(workflow, /actions\/configure-pages@v5/);
+  assert.match(workflow, /actions\/upload-pages-artifact@v4/);
+  assert.match(workflow, /path:\s*src/);
+  assert.match(workflow, /actions\/deploy-pages@v4/);
+});
+
 test('Rust health checks are pinned to Codex and never accept arbitrary URLs', async () => {
   const [health, shell, cargo] = await Promise.all([
     read('src-tauri', 'src', 'health.rs'),

@@ -53,6 +53,8 @@
           clearInput: document.querySelector("#clear-input"),
           copyOutput: document.querySelector("#copy-output"),
           cpaNotice: document.querySelector("#cpa-notice"),
+          desktopLiveCheck: document.querySelector("#desktop-live-check"),
+          desktopUpdateControls: document.querySelector("#desktop-update-controls"),
           downloadOutput: document.querySelector("#download-output"),
           downloadSplit: document.querySelector("#download-split"),
           fileInput: document.querySelector("#file-input"),
@@ -81,6 +83,11 @@
           outputSubtitle: document.querySelector("#output-subtitle"),
           appUpdateButton: document.querySelector("#check-app-update"),
           appUpdateStatus: document.querySelector("#app-update-status"),
+          runtimeFooterCopy: document.querySelector("#runtime-footer-copy"),
+          runtimeHealthMeta: document.querySelector("#runtime-health-meta"),
+          runtimeLocalMeta: document.querySelector("#runtime-local-meta"),
+          runtimeNavCopy: document.querySelector("#runtime-nav-copy"),
+          runtimeStatusLabel: document.querySelector("#runtime-status-label"),
           upstreamCheckButton: document.querySelector("#check-upstream-updates"),
           upstreamCheckStatus: document.querySelector("#upstream-check-status"),
           pickFiles: document.querySelector("#pick-files"),
@@ -89,6 +96,30 @@
           statErrors: document.querySelector("#stat-errors"),
           statFormat: document.querySelector("#stat-format"),
         };
+
+        function applyRuntimeChrome() {
+          const webRuntime = !isDesktopRuntime;
+          document.body?.classList?.toggle("web-runtime", webRuntime);
+
+          if (elements.desktopLiveCheck) {
+            elements.desktopLiveCheck.hidden = webRuntime;
+          }
+          if (elements.desktopUpdateControls) {
+            elements.desktopUpdateControls.hidden = webRuntime;
+          }
+          if (elements.runtimeHealthMeta) {
+            elements.runtimeHealthMeta.hidden = webRuntime;
+          }
+
+          if (webRuntime) {
+            if (elements.runtimeStatusLabel) elements.runtimeStatusLabel.textContent = "浏览器本地";
+            if (elements.runtimeNavCopy) elements.runtimeNavCopy.textContent = "转换和文件导出在当前浏览器完成；输入不会上传";
+            if (elements.runtimeLocalMeta) elements.runtimeLocalMeta.textContent = "浏览器本地解析";
+            if (elements.runtimeFooterCopy) elements.runtimeFooterCopy.textContent = "格式转换、文件读取和导出均在当前浏览器内完成；输入不会上传或写入存储。模型检测与软件更新请使用桌面版。";
+          }
+        }
+
+        applyRuntimeChrome();
 
         const exampleSession = {
           user: {
