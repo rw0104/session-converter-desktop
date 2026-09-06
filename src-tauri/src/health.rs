@@ -5,9 +5,10 @@ use std::time::Duration;
 use uuid::Uuid;
 
 const CHATGPT_CODEX_BASE_URL: &str = "https://chatgpt.com/backend-api/codex";
-const CODEX_CLIENT_VERSION: &str = "0.146.0";
+const CODEX_CLIENT_VERSION: &str = "0.153.3";
 const CODEX_ORIGINATOR: &str = "codex-tui";
-const CODEX_USER_AGENT: &str = "codex-tui/0.146.0 (Ubuntu 22.4.0; x86_64) xterm-256color";
+const CODEX_USER_AGENT: &str =
+    "codex-tui/0.153.3 (Mac OS 26.5.1; arm64) iTerm.app/3.6.11 (codex-tui; 0.153.3)";
 const MAX_PROBE_RESPONSE_BYTES: usize = 256 * 1024;
 
 #[derive(Debug, Clone, Serialize)]
@@ -176,6 +177,49 @@ fn request_headers(access_token: &str, account_id: &str) -> Result<HeaderMap, St
     Ok(headers)
 }
 
+fn models_request(client: &reqwest::Client, headers: HeaderMap) -> reqwest::RequestBuilder {
+    client
+        .get(format!(
+            "{CHATGPT_CODEX_BASE_URL}/models?client_version={CODEX_CLIENT_VERSION}"
+        ))
+        .headers(headers)
+}
+
+fn response_request(
+    client: &reqwest::Client,
+    mut headers: HeaderMap,
+    model: &str,
+) -> reqwest::RequestBuilder {
+    headers.insert(ACCEPT, HeaderValue::from_static("text/event-stream"));
+    headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+    headers.insert(
+        "openai-beta",
+        HeaderValue::from_static("responses=experimental"),
+    );
+    if let Ok(session_id) = HeaderValue::from_str(&Uuid::new_v4().to_string()) {
+        headers.insert("session_id", session_id);
+    }
+
+    client
+        .post(format!("{CHATGPT_CODEX_BASE_URL}/responses"))
+        .headers(headers)
+        .json(&json!({
+            "model": model,
+            "instructions": "",
+            "input": [{
+                "type": "message",
+                "role": "user",
+                "content": [{ "type": "input_text", "text": "Reply OK." }]
+            }],
+            "tools": [],
+            "tool_choice": "auto",
+            "reasoning": Value::Null,
+            "store": false,
+            "stream": true,
+            "include": []
+        }))
+}
+
 fn streamed_error_code(body: &[u8]) -> String {
     if let Ok(value) = serde_json::from_slice::<Value>(body) {
         let code = upstream_code(&value);
@@ -261,9 +305,7 @@ pub async fn probe_chatgpt_workspace(
         Err(_) => return ProbeResult::network("client_error"),
     };
 
-    let models_url =
-        format!("{CHATGPT_CODEX_BASE_URL}/models?client_version={CODEX_CLIENT_VERSION}");
-    let models_response = match client.get(models_url).headers(headers.clone()).send().await {
+    let models_response = match models_request(&client, headers.clone()).send().await {
         Ok(response) => response,
         Err(error) => {
             return ProbeResult::network(if error.is_timeout() {
@@ -311,39 +353,7 @@ pub async fn probe_chatgpt_workspace(
         };
     };
 
-    let body = json!({
-        "model": model,
-        "instructions": "",
-        "input": [{
-            "type": "message",
-            "role": "user",
-            "content": [{ "type": "input_text", "text": "Reply OK." }]
-        }],
-        "tools": [],
-        "tool_choice": "auto",
-        "reasoning": Value::Null,
-        "store": false,
-        "stream": true,
-        "include": []
-    });
-    let mut response_headers = headers;
-    response_headers.insert(ACCEPT, HeaderValue::from_static("text/event-stream"));
-    response_headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-    response_headers.insert(
-        "openai-beta",
-        HeaderValue::from_static("responses=experimental"),
-    );
-    if let Ok(session_id) = HeaderValue::from_str(&Uuid::new_v4().to_string()) {
-        response_headers.insert("session_id", session_id);
-    }
-
-    let model_response = match client
-        .post(format!("{CHATGPT_CODEX_BASE_URL}/responses"))
-        .headers(response_headers)
-        .json(&body)
-        .send()
-        .await
-    {
+    let model_response = match response_request(&client, headers, &model).send().await {
         Ok(response) => response,
         Err(error) => {
             return ProbeResult::network(if error.is_timeout() {
@@ -369,6 +379,72 @@ pub async fn probe_chatgpt_workspace(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn builds_model_catalog_request_with_current_codex_identity() {
+        let headers = request_headers("1234567890abcdef", "account_123").unwrap();
+        let request = models_request(&reqwest::Client::new(), headers)
+            .build()
+            .unwrap();
+
+        assert_eq!(request.method(), reqwest::Method::GET);
+        assert_eq!(
+            request.url().as_str(),
+            "https://chatgpt.com/backend-api/codex/models?client_version=0.153.3"
+        );
+        assert_eq!(request.headers()[AUTHORIZATION], "Bearer 1234567890abcdef");
+        assert_eq!(request.headers()["chatgpt-account-id"], "account_123");
+        assert_eq!(request.headers()["originator"], "codex-tui");
+        assert_eq!(request.headers()["version"], "0.153.3");
+        assert_eq!(
+            request.headers()[USER_AGENT],
+            "codex-tui/0.153.3 (Mac OS 26.5.1; arm64) iTerm.app/3.6.11 (codex-tui; 0.153.3)"
+        );
+        assert_eq!(request.headers()[ACCEPT], "application/json");
+        assert!(!request.headers().contains_key("session_id"));
+        assert!(request.body().is_none());
+    }
+
+    #[test]
+    fn builds_minimal_streaming_probe_for_the_selected_model() {
+        let client = reqwest::Client::new();
+        let headers = request_headers("1234567890abcdef", "").unwrap();
+        let build = || {
+            response_request(&client, headers.clone(), "gpt-free-model")
+                .build()
+                .unwrap()
+        };
+        let request = build();
+
+        assert_eq!(request.method(), reqwest::Method::POST);
+        assert_eq!(
+            request.url().as_str(),
+            "https://chatgpt.com/backend-api/codex/responses"
+        );
+        assert_eq!(request.headers()[AUTHORIZATION], "Bearer 1234567890abcdef");
+        assert_eq!(request.headers()["originator"], "codex-tui");
+        assert_eq!(request.headers()["version"], "0.153.3");
+        assert_eq!(request.headers()[USER_AGENT], headers[USER_AGENT]);
+        assert!(!request.headers().contains_key("chatgpt-account-id"));
+        assert_eq!(request.headers()[ACCEPT], "text/event-stream");
+        assert_eq!(request.headers()[CONTENT_TYPE], "application/json");
+        assert_eq!(request.headers()["openai-beta"], "responses=experimental");
+        let session_id = request.headers()["session_id"].to_str().unwrap();
+        assert!(Uuid::parse_str(session_id).is_ok());
+        assert_ne!(
+            request.headers()["session_id"],
+            build().headers()["session_id"]
+        );
+
+        let body: Value =
+            serde_json::from_slice(request.body().unwrap().as_bytes().unwrap()).unwrap();
+        assert_eq!(body["model"], "gpt-free-model");
+        assert_eq!(body["stream"], true);
+        assert_eq!(body["store"], false);
+        assert_eq!(body["tools"], json!([]));
+        assert_eq!(body["input"][0]["content"][0]["text"], "Reply OK.");
+        assert!(body.get("parallel_tool_calls").is_none());
+    }
 
     #[test]
     fn validates_probe_credentials_without_network() {

@@ -7,8 +7,8 @@
       "label": "CLIProxyAPI",
       "repository": "router-for-me/CLIProxyAPI",
       "branch": "main",
-      "auditedCommit": "2a6b87aca083a5bf498ac1f68a1b636c500d7aaa",
-      "auditedDate": "2026-09-03",
+      "auditedCommit": "c76dfd4e0edabab9000628b1560ab8ab379eadb8",
+      "auditedDate": "2026-09-06",
       "files": [
         {
           "path": "internal/auth/codex/token.go",
@@ -20,11 +20,11 @@
         },
         {
           "path": "cmd/fetch_codex_models/main.go",
-          "blobSha": "1f787ffe2bab41bb3005163a665f74079e3d5b10"
+          "blobSha": "48c71036449a4169c2ffe04626766aa60145064c"
         },
         {
           "path": "internal/runtime/executor/codex_executor_request.go",
-          "blobSha": "e713eaf892bf0758ffc9d5e0a0f324f499617067"
+          "blobSha": "6842ed8f44de06a72ccf333dc925537605d14b97"
         }
       ]
     },
