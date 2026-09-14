@@ -5,10 +5,10 @@ use std::time::Duration;
 use uuid::Uuid;
 
 const CHATGPT_CODEX_BASE_URL: &str = "https://chatgpt.com/backend-api/codex";
-const CODEX_CLIENT_VERSION: &str = "0.153.3";
+const CODEX_CLIENT_VERSION: &str = "0.154.0";
 const CODEX_ORIGINATOR: &str = "codex-tui";
 const CODEX_USER_AGENT: &str =
-    "codex-tui/0.153.3 (Mac OS 26.5.1; arm64) iTerm.app/3.6.11 (codex-tui; 0.153.3)";
+    "codex-tui/0.154.0 (Mac OS 26.5.2; arm64) iTerm.app/3.6.11 (codex-tui; 0.154.0)";
 const MAX_PROBE_RESPONSE_BYTES: usize = 256 * 1024;
 
 #[derive(Debug, Clone, Serialize)]
@@ -390,15 +390,15 @@ mod tests {
         assert_eq!(request.method(), reqwest::Method::GET);
         assert_eq!(
             request.url().as_str(),
-            "https://chatgpt.com/backend-api/codex/models?client_version=0.153.3"
+            "https://chatgpt.com/backend-api/codex/models?client_version=0.154.0"
         );
         assert_eq!(request.headers()[AUTHORIZATION], "Bearer 1234567890abcdef");
         assert_eq!(request.headers()["chatgpt-account-id"], "account_123");
         assert_eq!(request.headers()["originator"], "codex-tui");
-        assert_eq!(request.headers()["version"], "0.153.3");
+        assert_eq!(request.headers()["version"], "0.154.0");
         assert_eq!(
             request.headers()[USER_AGENT],
-            "codex-tui/0.153.3 (Mac OS 26.5.1; arm64) iTerm.app/3.6.11 (codex-tui; 0.153.3)"
+            "codex-tui/0.154.0 (Mac OS 26.5.2; arm64) iTerm.app/3.6.11 (codex-tui; 0.154.0)"
         );
         assert_eq!(request.headers()[ACCEPT], "application/json");
         assert!(!request.headers().contains_key("session_id"));
@@ -423,12 +423,16 @@ mod tests {
         );
         assert_eq!(request.headers()[AUTHORIZATION], "Bearer 1234567890abcdef");
         assert_eq!(request.headers()["originator"], "codex-tui");
-        assert_eq!(request.headers()["version"], "0.153.3");
+        assert_eq!(request.headers()["version"], "0.154.0");
         assert_eq!(request.headers()[USER_AGENT], headers[USER_AGENT]);
         assert!(!request.headers().contains_key("chatgpt-account-id"));
         assert_eq!(request.headers()[ACCEPT], "text/event-stream");
         assert_eq!(request.headers()[CONTENT_TYPE], "application/json");
         assert_eq!(request.headers()["openai-beta"], "responses=experimental");
+        assert!(!request.headers().contains_key("x-codex-turn-state"));
+        assert!(!request
+            .headers()
+            .contains_key("x-openai-internal-codex-responses-lite"));
         let session_id = request.headers()["session_id"].to_str().unwrap();
         assert!(Uuid::parse_str(session_id).is_ok());
         assert_ne!(

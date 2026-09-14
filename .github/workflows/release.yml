@@ -53,14 +53,14 @@ jobs:
           tagName: v__VERSION__
           releaseName: Session Converter v__VERSION__
           releaseBody: |
-            ## v0.1.10 算法兼容性更新
+            ## v0.1.11 算法兼容性更新
 
             同步最新上游 Codex 检测协议，并复核 CPA / sub2api 转换规则。
 
-            - 模型列表查询的 client_version、Version 请求头和 Codex 请求身份同步至 0.153.3。
-            - User-Agent 对齐 CLIProxyAPI 当前默认值，继续支持自动匹配账号可用模型。
-            - 复核 CLIProxyAPI c76dfd4e 和 sub2api ab99d56e；账号字段与 Agent Identity 规则保持兼容。
-            - 新增模型列表和流式检测请求的离线回归测试。
+            - 模型列表查询的 client_version、Version 请求头和 Codex 请求身份同步至 0.154.0。
+            - 复核 CLIProxyAPI 7fa443dc 和 sub2api bdb42e22；账号字段与 Agent Identity 规则保持兼容。
+            - 确认 X-Codex-Turn-State 与 Responses-Lite 变更只影响代理透传，本地最小检测不伪造客户端状态。
+            - 更新离线请求构造回归测试并完成全套转换、Rust 与桌面集成测试。
 
             提供 Windows、macOS（Apple Silicon / Intel）和 Linux 安装包，支持应用内签名更新。
           releaseDraft: false

@@ -95,7 +95,7 @@ test('Rust health checks are pinned to Codex and never accept arbitrary URLs', a
   ]);
 
   assert.match(health, /https:\/\/chatgpt\.com\/backend-api\/codex/);
-  assert.match(health, /codex-tui\/0\.153\.3/);
+  assert.match(health, /codex-tui\/0\.154\.0/);
   assert.match(health, /responses=experimental/);
   assert.match(health, /streamed_error_code/);
   assert.match(health, /requested_model: String/);
