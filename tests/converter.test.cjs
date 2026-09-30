@@ -514,6 +514,87 @@ function testSyntheticIdTokenHasCodexParseableJwtFormat() {
   assert.equal(payload["https://api.openai.com/auth"].chatgpt_account_id, "00000000-0000-4000-9000-000000000000");
 }
 
+function planToken(planType) {
+  return jwtWithPayload({ "https://api.openai.com/auth": { chatgpt_plan_type: planType } });
+}
+
+function testSessionCpaPlanTypeMatchesUpstreamDefaultAndClaims() {
+  const cases = [
+    [{}, "free"],
+    [{ plan_type: " \t ", accessToken: planToken(" \n ") }, "free"],
+    [{ plan_type: 7, idToken: "invalid-token", accessToken: planToken(null) }, "free"],
+    [{ chatgpt_plan_type: " enterprise " }, "enterprise"],
+    [{ idToken: planToken(" team "), accessToken: planToken("plus") }, "team"],
+    [{ idToken: planToken(" "), accessToken: planToken(" pro ") }, "pro"],
+    [{ plan_type: " free ", idToken: planToken("plus") }, "free"],
+    [{ plan_type: " future-plan ", idToken: planToken("plus") }, "future-plan"],
+  ];
+  for (const [fields, expected] of cases) {
+    const { elements, formatButtons } = loadPageScript();
+    dispatch(formatButtons.find((button) => button.dataset.format === "cpa"), "click");
+    const input = elements.get("#session-input");
+    input.value = JSON.stringify({ email: "plan@example.com", account: { id: "acc-plan" }, accessToken: "opaque-access", ...fields });
+    dispatch(input, "input");
+    const cpa = JSON.parse(elements.get("#output").value);
+    assert.equal(cpa.plan_type, expected);
+    assert.equal(cpa.chatgpt_plan_type, expected);
+    if (fields.idToken) {
+      assert.equal(cpa.id_token, fields.idToken, "existing ID tokens must remain byte-for-byte unchanged");
+    } else {
+      const payload = JSON.parse(Buffer.from(cpa.id_token.split(".")[1], "base64url").toString("utf8"));
+      assert.equal(payload["https://api.openai.com/auth"].chatgpt_plan_type, expected);
+    }
+    dispatch(formatButtons.find((button) => button.dataset.format === "sub2api"), "click");
+    assert.equal(JSON.parse(elements.get("#output").value).accounts[0].credentials.plan_type, expected);
+  }
+}
+
+function testBridgeCodexPlanTypeFallbackAndRoundTrips() {
+  const { context } = loadPageScript();
+  const bridge = context.SessionConverterBridge;
+  const cases = [
+    [{}, "free"],
+    [{ plan_type: " \n ", id_token: planToken(" \t ") }, "free"],
+    [{ plan_type: 42, id_token: "bad.jwt.payload", access_token: planToken(false) }, "free"],
+    [{ id_token: jwtWithPayload(null) }, "free"],
+    [{ plan_type: " pro ", id_token: planToken("plus") }, "pro"],
+    [{ plan_type: "free", id_token: planToken("team") }, "free"],
+    [{ chatgpt_plan_type: " business " }, "business"],
+    [{ id_token: planToken(" enterprise "), access_token: planToken("plus") }, "enterprise"],
+    [{ id_token: planToken(" "), access_token: planToken(" team ") }, "team"],
+    [{ id_token: "not-a-jwt", access_token: planToken(" future-plan ") }, "future-plan"],
+  ];
+  for (const [fields, expected] of cases) {
+    const source = { type: "codex", access_token: "opaque-access", account_id: "acc-plan", ...fields };
+    const sub = bridge.convertCPARecord({ name: "plan.json", value: source });
+    assert.equal(sub.account.credentials.plan_type, expected);
+    const roundTrip = bridge.convertSubAccount({ name: "plan.json", value: sub.account });
+    assert.equal(roundTrip.account.plan_type, expected);
+    assert.equal(roundTrip.account.access_token, source.access_token);
+    assert.equal(roundTrip.account.id_token, source.id_token);
+    // Exercise sub2api -> CPA independently, without CPA -> sub2api having
+    // already populated plan_type from the tokens.
+    const direct = bridge.convertSubAccount({
+      name: "plan.json",
+      value: { platform: "openai", type: "oauth", credentials: source },
+    });
+    assert.equal(direct.account.plan_type, expected);
+  }
+}
+
+function testBridgeDoesNotDefaultCodexPlanForOtherProviders() {
+  const { context } = loadPageScript();
+  const bridge = context.SessionConverterBridge;
+  for (const provider of ["claude", "antigravity", "xai", "gemini"]) {
+    const source = { type: provider, access_token: planToken("plus"), id_token: planToken("team") };
+    const sub = bridge.convertCPARecord({ name: "other.json", value: source });
+    assert.equal(sub.account.credentials.plan_type, undefined, provider);
+    if (provider === "gemini") continue; // Legacy Gemini migration is one-way.
+    const cpa = bridge.convertSubAccount({ name: "other.json", value: sub.account });
+    assert.equal(cpa.account.plan_type, undefined, provider);
+  }
+}
+
 function testAxonHubAuthJsonUsesPlaceholderRefreshTokenWhenMissing() {
   const { elements, formatButtons } = loadPageScript();
   const axonHubButton = formatButtons.find((button) => button.dataset.format === "axonhub");
@@ -1631,6 +1712,9 @@ async function main() {
   testSub2apiAccountWithRefreshTokenKeepsTokenExpiryAndClientId();
   testCpaOutputMatchesCodexTokenStorageCore();
   testSyntheticIdTokenHasCodexParseableJwtFormat();
+  testSessionCpaPlanTypeMatchesUpstreamDefaultAndClaims();
+  testBridgeCodexPlanTypeFallbackAndRoundTrips();
+  testBridgeDoesNotDefaultCodexPlanForOtherProviders();
   testAxonHubAuthJsonUsesPlaceholderRefreshTokenWhenMissing();
   testAxonHubAuthJsonPreservesRealRefreshToken();
   testCodexAuthJsonMatchesNativeShapeWhenMissingRefreshToken();

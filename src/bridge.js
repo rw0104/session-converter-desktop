@@ -9,11 +9,11 @@
       id: "cliproxyapi",
       label: "CLIProxyAPI",
       branch: "main",
-      shortSha: "55566294",
-      fullSha: "555662940411a07460e9d24d14477a5f50dffdb5",
-      date: "2026-09-22",
+      shortSha: "a270e7b9",
+      fullSha: "a270e7b9e57aaecd8f82555f44c2108518ad2330",
+      date: "2026-09-29",
       repoUrl: "https://github.com/router-for-me/CLIProxyAPI",
-      commitUrl: "https://github.com/router-for-me/CLIProxyAPI/commit/555662940411a07460e9d24d14477a5f50dffdb5",
+      commitUrl: "https://github.com/router-for-me/CLIProxyAPI/commit/a270e7b9e57aaecd8f82555f44c2108518ad2330",
     }),
     Object.freeze({
       id: "sub2api",
@@ -139,6 +139,40 @@
 
   function nestedToken(obj) {
     return obj && typeof obj.token === "object" && obj.token !== null ? obj.token : {};
+  }
+
+  // CLIProxyAPI JWTClaims.GetPlanType preserves any nonblank string and
+  // defaults to free. Do not coerce numbers or invent an enum of plan names.
+  function resolveCodexPlanType(...values) {
+    for (const value of values) {
+      if (typeof value === "string" && value.trim()) return value.trim();
+    }
+    return "free";
+  }
+
+  function codexPlanTypeFromJwt(token) {
+    if (typeof token !== "string") return undefined;
+    const parts = token.split(".");
+    if (parts.length !== 3) return undefined;
+    try {
+      const normalized = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+      const binary = atob(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "="));
+      const payload = JSON.parse(new TextDecoder().decode(Uint8Array.from(binary, (char) => char.charCodeAt(0))));
+      return payload?.["https://api.openai.com/auth"]?.chatgpt_plan_type;
+    } catch (_) {
+      return undefined;
+    }
+  }
+
+  function extractCodexPlanType(source, idToken, accessToken) {
+    return resolveCodexPlanType(
+      source.plan_type,
+      source.planType,
+      source.chatgpt_plan_type,
+      source.chatgptPlanType,
+      codexPlanTypeFromJwt(idToken),
+      codexPlanTypeFromJwt(accessToken),
+    );
   }
 
   function stripBOM(text) {
@@ -322,6 +356,9 @@
     for (const key of ["client_id", "client_secret", "token_uri", "scope", "token_type"]) {
       addKnownCredential(credentials, token, key);
     }
+    if (platform === "openai") {
+      credentials.plan_type = extractCodexPlanType(meta, idToken, accessToken);
+    }
 
     const accountId = firstString(meta, ["account_id", "accountId"]);
     if (accountId) {
@@ -464,6 +501,9 @@
         "auth_mode",
       ]) {
         addKnownCredential(auth, creds, key);
+      }
+      if (provider === "codex") {
+        auth.plan_type = extractCodexPlanType(creds, idToken, accessToken);
       }
     }
 
@@ -1166,6 +1206,7 @@
     renderSourcePins,
     PROVIDER_TO_PLATFORM,
     PLATFORM_TO_PROVIDER,
+    resolveCodexPlanType,
     convertBridgeText,
     convertBridgeFiles,
     convertCPARecord,

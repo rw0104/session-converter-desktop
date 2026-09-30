@@ -7,24 +7,24 @@
       "label": "CLIProxyAPI",
       "repository": "router-for-me/CLIProxyAPI",
       "branch": "main",
-      "auditedCommit": "555662940411a07460e9d24d14477a5f50dffdb5",
-      "auditedDate": "2026-09-22",
+      "auditedCommit": "a270e7b9e57aaecd8f82555f44c2108518ad2330",
+      "auditedDate": "2026-09-29",
       "files": [
         {
           "path": "internal/auth/codex/token.go",
-          "blobSha": "c7ea0fb6d23ba0acbd76c6f6f23c3dce8647b4f7"
+          "blobSha": "05d95d9b4728c2a832ebf4a8a170898b2f788220"
         },
         {
           "path": "internal/auth/codex/jwt_parser.go",
-          "blobSha": "130e86420acc37b5cf9d79b293771422cefaea1c"
+          "blobSha": "a49befef6db3d5f3f13b61ab36821bb521eb24c2"
         },
         {
           "path": "cmd/fetch_codex_models/main.go",
-          "blobSha": "4dbfab0c584b9ee4b6b3c7bddc8e020df5504d6a"
+          "blobSha": "607cf77b8487ab27537f2e55c6de132220c9b9e1"
         },
         {
           "path": "internal/runtime/executor/codex_executor_request.go",
-          "blobSha": "b67eda88c13d05933e2fed26c940687a39efc7d1"
+          "blobSha": "6e948f9bd3acb3071531f19ace19d38a6f746689"
         }
       ]
     },

@@ -909,16 +909,19 @@
             payload?.sub,
             idPayload?.sub,
           );
-          const planType = firstNonEmpty(
+          const planType = bridge.resolveCodexPlanType(
             record.account?.planType,
             record.account?.plan_type,
             record.planType,
             record.plan_type,
+            record.chatgptPlanType,
+            record.chatgpt_plan_type,
             record.providerSpecificData?.chatgptPlanType,
             record.providerSpecificData?.chatgpt_plan_type,
             record.credentials?.plan_type,
-            auth.chatgpt_plan_type,
+            record.credentials?.chatgpt_plan_type,
             idAuth.chatgpt_plan_type,
+            auth.chatgpt_plan_type,
           );
           const organizationId = firstNonEmpty(
             record.organization_id,
@@ -962,10 +965,10 @@
             last_refresh: exportedAt,
             email,
             expired: tokenExpiresAt || undefined,
+            plan_type: planType,
             // Compatibility extras kept for tooling that still reads them.
             chatgpt_account_id: accountId,
             name,
-            plan_type: planType,
             chatgpt_plan_type: planType,
             chatgpt_user_id: userId,
             organization_id: organizationId,

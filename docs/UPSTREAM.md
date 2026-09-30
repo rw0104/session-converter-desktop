@@ -5,14 +5,14 @@
 - 导入日期：2026-07-16
 - 许可证：MIT，完整文本见同目录 `LICENSE`
 
-## 账户导出算法钉（P0，2026-09-14 复核）
+## 账户导出算法钉（P0，2026-09-30 复核）
 
 转换器的 **sub2api / CPA 账户字段** 已对齐下列仓库的导入/存储核心算法（只抽取 schema 与字段规则，不嵌入完整服务代码），对照实现参考 [cvt.okcode.cc.cd](https://cvt.okcode.cc.cd/) / [semyin/cvt](https://github.com/semyin/cvt)：
 
 | 目标格式 | 源仓库 | 钉死提交 | 日期 | 核心依据 |
 | --- | --- | --- | --- | --- |
-| CPA / Codex 模型检测 | [router-for-me/CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) | `7fa443dc8bf8ca2f1ffd81c2472deb31b097b697`（短：`7fa443dc`） | 2026-09-14 | `internal/auth/codex/token.go`、`jwt_parser.go`、`cmd/fetch_codex_models/main.go`、`internal/runtime/executor/codex_executor_request.go` |
-| sub2api | [Wei-Shaw/sub2api](https://github.com/Wei-Shaw/sub2api) | `bdb42e22f81fcb633ff0a060961211dd2bcb515b`（短：`bdb42e22`） | 2026-09-12 | `backend/internal/handler/admin/account_codex_import.go`、`backend/internal/pkg/openai/oauth.go`（`ClientID`） |
+| CPA / Codex 模型检测 | [router-for-me/CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) | `a270e7b9e57aaecd8f82555f44c2108518ad2330`（短：`a270e7b9`） | 2026-09-29 | `internal/auth/codex/token.go`、`jwt_parser.go`、`cmd/fetch_codex_models/main.go`、`internal/runtime/executor/codex_executor_request.go` |
+| sub2api | [Wei-Shaw/sub2api](https://github.com/Wei-Shaw/sub2api) | `42bc7f6cffe24bcb471608e48e66b4a0afa1f882`（短：`42bc7f6c`） | 2026-09-30 | `backend/internal/handler/admin/account_codex_import.go`、`backend/internal/pkg/openai/oauth.go`（`ClientID`） |
 
 页面顶部将「软件更新」和「算法映射状态」分开。软件更新只读取本仓库签名 Release；算法检测读取 `config/upstream-audit.json`，比较上表 6 个真正相关文件在上游 `main` 树中的 Git blob SHA，不再用整个仓库 HEAD 判断算法变化。算法上游源码不会被下载或执行。
 
@@ -29,7 +29,7 @@ P0 行为要点：
 - OpenAI OAuth 账户默认 `concurrency: 10`、`priority: 1`、`rate_multiplier: 1`、`auto_pause_on_expired: true`。
 - 有 `refresh_token` 时写入官方 `client_id = app_EMoamEEZ73f0CkXaXp7hrann`。
 - `credentials` 写入 `access_token`、可选 `id_token` / `refresh_token`、`chatgpt_account_id`、`chatgpt_user_id`、`organization_id`、`plan_type`；令牌过期写在 `credentials.expires_at`（优先 access JWT `exp`），不再因存在 refresh 而清空。
-- CPA 输出以 `CodexTokenStorage` 核心字段为准：`type/id_token/access_token/refresh_token/account_id/last_refresh/email/expired`；并保留兼容扩展字段。
+- CPA 输出以 `CodexTokenStorage` 核心字段为准：`type/id_token/access_token/refresh_token/account_id/last_refresh/email/expired/plan_type`；并保留兼容扩展字段。Codex 账户优先保留显式套餐，从 ID / access JWT 补全缺失值，无套餐信息时按上游回落到 `free`。
 - session cookie 的 `expires` 仅记入 `extra.session_expires_at`，不当作 access token 过期时间。
 
 ## Agent Identity 凭据（2026-07-26 重新对齐）
@@ -84,11 +84,14 @@ Agent Identity 行为要点（对齐 `2730c1c4`）：
 - 2026-08-08：重新复核并钉到 CLIProxyAPI `197f5204` / sub2api `cc67b1ac`。账户 schema 文件无内容变化；Codex 检测身份更新为配套的 `codex-tui/0.146.0`、`Originator: codex-tui`、`Version: 0.146.0`，Responses 请求补 `OpenAI-Beta: responses=experimental`。
 - 2026-08-08：检测开始读取最多 256 KiB 的 SSE 响应并识别流内错误。明确停用/鉴权错误才标记不可用；`server_is_overloaded`、限流、网络错误和 5xx 保持未知，避免误清理。
 - 2026-08-08：原始 Session 转换上游仍为 `a097eb15`，没有新提交。本项目继续以 access JWT `exp` 为 token 到期依据，`sessionToken` 为可选字段，Session Cookie `expires` 只存入 `extra.session_expires_at`。
-- 2026-08-14：CLIProxyAPI 推进到 `78f0c407` 并复核。`token.go` 仅为重构（logrus 导入、`MergeMetadata` 调用提前、Close 错误日志），`CodexTokenStorage` schema 无任何字段变化；`codex_executor_request.go` 将代理层头部 `Session_id` 改名 `Session-Id`（HTTP 头大小写不敏感，与本机检测下发的 `session_id` 语义等价）、透传 `X-Codex-Window-Id` / `Thread-Id` / `Session-Id` / `X-Openai-Internal-Codex-Responses-Lite`（均为代理透传，非客户端默认值），并移除仅对 Mac OS UA 生效的 `Session_id` 生成特例。本机检测为直连最小实现，不实现代理的 identity-confusion / prompt-cache 层，映射与检测算法无需改动，钉值随之推进。
+- 2026-08-14：CLIProxyAPI 推进到 `78f0c407` 并复核。`token.go` 仅为重构（logrus 导入、`MergeMetadata` 调用提前、Close 错误日志），`CodexTokenStorage` schema 无任何字段变化；`codex_executor_request.go` 将代理层头部 `Session_id` 改名 `Session-Id`（这是不同的头字段；CPA helper 显式兼容连字符和下划线写法，HTTP 标准仅保证大小写不敏感）、透传 `X-Codex-Window-Id` / `Thread-Id` / `Session-Id` / `X-Openai-Internal-Codex-Responses-Lite`（均为代理透传，非客户端默认值），并移除仅对 Mac OS UA 生效的 `Session_id` 生成特例。本机检测为直连最小实现，不实现代理的 identity-confusion / prompt-cache 层，映射与检测算法无需改动，钉值随之推进。
 - 2026-08-18：CLIProxyAPI 推进到 `497673bf` 并复核。受审计的变化仅在 `codex_executor_request.go`：代理执行器现可显式接收下游请求头，并将 auth 属性中形如 `header: "$ABC"` 的动态自定义头解析为该下游头的值。这是 CLIProxyAPI 代理配置的请求透传能力，未改动 `CodexTokenStorage` 字段、Codex 认证头或 models/responses 协议；本应用直连固定上游且不接收自定义请求头，因此转换与检测算法无需改动，仅更新审计 blob 钉。sub2api 相关两个 blob 未变，仅推进审计提交至 `c6f4fbde`。
 - 2026-08-29：CLIProxyAPI 推进到 `f0de1d00` 并复核。受审计的变化仅在 `codex_executor_request.go`：空 token 时主动删除已有 `Authorization`，并改用统一 helper 识别 API Key 认证，避免代理复用请求对象或 base-URL-only 配置时携带陈旧凭证。本应用的测活入口会在网络请求前拒绝空 access token，且不复用上游请求对象；账户 schema、Codex 身份头和 models/responses 协议均未变化，因此转换与检测算法无需改动，仅更新审计 blob 钉。sub2api 两个相关 blob 未变，仅推进审计提交至 `b5827cfd`。
 - 2026-08-29：实际模型检测默认值由硬编码 `sol` 改为 `auto`。Rust 先读取每个账号实际可见模型再发起最小请求，避免 `sol` 不在账号模型列表时默认检测只返回 `requested_model_unavailable` 而没有执行 Responses 检测；手动指定模型的行为保持不变。
 - 2026-09-06（v0.1.10）：复核 CLIProxyAPI `2a6b87ac → c76dfd4e`，两个变化文件都只更新默认客户端身份：模型拉取器将 `defaultClientVersion` / UA 从 `0.144.1` 升至 `0.153.3`，执行器将 `codex-tui/0.146.0` 升至 `codex-tui/0.153.3`。本机检测的 models 查询参数、`Version` 请求头统一升至 `0.153.3`，UA 完整对齐执行器当前默认值；继续使用 `Originator: codex-tui` 和自动模型选择。新增离线请求构造回归测试，覆盖固定 URL、认证与可选空间头、版本身份、流式最小请求体及每次请求独立的会话 ID。CPA 两个 schema blob、sub2api 两个导入/OAuth blob 均未变化；sub2api 提交复核至 `ab99d56e`，原始 Session 转换上游仍为 `a097eb15`。
 - 2026-09-14（v0.1.11）：复核 CLIProxyAPI `c76dfd4e → 7fa443dc`。模型拉取器和执行器的默认 Codex 客户端身份均升至 `0.154.0`，本机检测同步更新 models 查询参数、`Version` 请求头和 `codex-tui` UA。执行器另外新增下游 `X-Codex-Turn-State` 透传并对原生 Responses-Lite 请求跳过代理层规范化；本应用不接收下游代理请求，也不使用 Responses-Lite，固定直连的最小探测不应伪造这两类客户端状态，离线测试明确验证其缺席。CLIProxyAPI 两个账户 schema blob、sub2api 两个导入/OAuth blob 均未变化；sub2api 提交复核至 `bdb42e22`，原始 Session 转换上游仍为 `a097eb15`。
+
+- 2026-09-30（v0.1.12）：逐文件复核 CLIProxyAPI `7fa443dc → a270e7b9`，更新全部四个相关 blob。`CodexTokenStorage` 新增 `plan_type`；Session → CPA / sub2api 和 CPA ↔ sub2api 的 Codex 账户统一保留非空字符串套餐，缺失时依次读取 ID JWT、access JWT，最终回落为 `free`。未知套餐名称保持原值，真实令牌不改写，其他提供商不注入默认套餐。
+- 2026-09-30（v0.1.12）：模型目录请求独立对齐 `codex_cli_rs/0.155.0 (Mac OS 26.3.1; arm64) iTerm.app/3.6.9`、`Originator: codex_cli_rs` 和 `client_version=0.155.0`，按上游拉取器移除该请求的 `Version`。Responses 执行器仍使用 `codex-tui/0.154.0 (Mac OS 26.5.2; arm64) iTerm.app/3.6.11 (codex-tui; 0.154.0)`；本应用保留对应 `Originator` 和自身客户端 `Version: 0.154.0`，新增 `X-Codex-Routing-Hint: model=<实际选中的模型>`。探测不请求 service tier，因此不添加 `tier`。保留现有 `session_id`；目标提交的 HTTP Mac OS fallback 仍发送 `Session_id`，CPA helper 显式兼容两种拼写，这不代替服务端实网验证。上游的套餐刷新写回、v8 导入路径、translation envelope / update-intent、identity-confuse 移除及按账号配置的 cloaking 属于代理实现，不加入本地无刷新、无持久化的直连流程。sub2api 两个相关 blob 未变，复核至 `42bc7f6c`；原始转换来源仍为 `a097eb15`。验证范围和证据见 [v0.1.12 发布复核](2026-09-30_release-v0.1.12-report.md)。
 
 本地检测只筛除确认 401、402、403 或本地确认过期的转换项，不改写其余输出字段。真实模型检测会产生极少量模型用量。后续升级必须重新核对 CLIProxyAPI / sub2api 账户 schema 与官方 Codex 请求协议，并执行安全审计、上游测试和桌面应用回归测试。

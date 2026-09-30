@@ -95,7 +95,11 @@ test('Rust health checks are pinned to Codex and never accept arbitrary URLs', a
   ]);
 
   assert.match(health, /https:\/\/chatgpt\.com\/backend-api\/codex/);
+  assert.match(health, /CODEX_MODELS_CLIENT_VERSION: &str = "0\.155\.0"/);
+  assert.match(health, /codex_cli_rs\/0\.155\.0 \(Mac OS 26\.3\.1; arm64\) iTerm\.app\/3\.6\.9/);
   assert.match(health, /codex-tui\/0\.154\.0/);
+  assert.match(health, /\.header\("x-codex-routing-hint", format!\("model=\{model\}"\)\)/);
+  assert.match(health, /redirect\(reqwest::redirect::Policy::none\(\)\)/);
   assert.match(health, /responses=experimental/);
   assert.match(health, /streamed_error_code/);
   assert.match(health, /requested_model: String/);

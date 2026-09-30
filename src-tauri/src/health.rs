@@ -5,9 +5,13 @@ use std::time::Duration;
 use uuid::Uuid;
 
 const CHATGPT_CODEX_BASE_URL: &str = "https://chatgpt.com/backend-api/codex";
-const CODEX_CLIENT_VERSION: &str = "0.154.0";
-const CODEX_ORIGINATOR: &str = "codex-tui";
-const CODEX_USER_AGENT: &str =
+// The audited upstream uses distinct identities for catalog and Responses requests.
+const CODEX_MODELS_CLIENT_VERSION: &str = "0.155.0";
+const CODEX_MODELS_ORIGINATOR: &str = "codex_cli_rs";
+const CODEX_MODELS_USER_AGENT: &str = "codex_cli_rs/0.155.0 (Mac OS 26.3.1; arm64) iTerm.app/3.6.9";
+const CODEX_RESPONSE_CLIENT_VERSION: &str = "0.154.0";
+const CODEX_RESPONSE_ORIGINATOR: &str = "codex-tui";
+const CODEX_RESPONSE_USER_AGENT: &str =
     "codex-tui/0.154.0 (Mac OS 26.5.2; arm64) iTerm.app/3.6.11 (codex-tui; 0.154.0)";
 const MAX_PROBE_RESPONSE_BYTES: usize = 256 * 1024;
 
@@ -158,10 +162,6 @@ fn upstream_code(value: &Value) -> String {
 
 fn request_headers(access_token: &str, account_id: &str) -> Result<HeaderMap, String> {
     let mut headers = HeaderMap::new();
-    headers.insert(ACCEPT, HeaderValue::from_static("application/json"));
-    headers.insert(USER_AGENT, HeaderValue::from_static(CODEX_USER_AGENT));
-    headers.insert("originator", HeaderValue::from_static(CODEX_ORIGINATOR));
-    headers.insert("version", HeaderValue::from_static(CODEX_CLIENT_VERSION));
     headers.insert(
         AUTHORIZATION,
         HeaderValue::from_str(&format!("Bearer {access_token}"))
@@ -177,10 +177,20 @@ fn request_headers(access_token: &str, account_id: &str) -> Result<HeaderMap, St
     Ok(headers)
 }
 
-fn models_request(client: &reqwest::Client, headers: HeaderMap) -> reqwest::RequestBuilder {
+fn models_request(client: &reqwest::Client, mut headers: HeaderMap) -> reqwest::RequestBuilder {
+    headers.insert(ACCEPT, HeaderValue::from_static("application/json"));
+    headers.insert(
+        USER_AGENT,
+        HeaderValue::from_static(CODEX_MODELS_USER_AGENT),
+    );
+    headers.insert(
+        "originator",
+        HeaderValue::from_static(CODEX_MODELS_ORIGINATOR),
+    );
+
     client
         .get(format!(
-            "{CHATGPT_CODEX_BASE_URL}/models?client_version={CODEX_CLIENT_VERSION}"
+            "{CHATGPT_CODEX_BASE_URL}/models?client_version={CODEX_MODELS_CLIENT_VERSION}"
         ))
         .headers(headers)
 }
@@ -191,6 +201,18 @@ fn response_request(
     model: &str,
 ) -> reqwest::RequestBuilder {
     headers.insert(ACCEPT, HeaderValue::from_static("text/event-stream"));
+    headers.insert(
+        USER_AGENT,
+        HeaderValue::from_static(CODEX_RESPONSE_USER_AGENT),
+    );
+    headers.insert(
+        "originator",
+        HeaderValue::from_static(CODEX_RESPONSE_ORIGINATOR),
+    );
+    headers.insert(
+        "version",
+        HeaderValue::from_static(CODEX_RESPONSE_CLIENT_VERSION),
+    );
     headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
     headers.insert(
         "openai-beta",
@@ -203,6 +225,8 @@ fn response_request(
     client
         .post(format!("{CHATGPT_CODEX_BASE_URL}/responses"))
         .headers(headers)
+        // The probe requests no service tier; keep the hint tied to the actual model.
+        .header("x-codex-routing-hint", format!("model={model}"))
         .json(&json!({
             "model": model,
             "instructions": "",
@@ -390,18 +414,19 @@ mod tests {
         assert_eq!(request.method(), reqwest::Method::GET);
         assert_eq!(
             request.url().as_str(),
-            "https://chatgpt.com/backend-api/codex/models?client_version=0.154.0"
+            "https://chatgpt.com/backend-api/codex/models?client_version=0.155.0"
         );
         assert_eq!(request.headers()[AUTHORIZATION], "Bearer 1234567890abcdef");
         assert_eq!(request.headers()["chatgpt-account-id"], "account_123");
-        assert_eq!(request.headers()["originator"], "codex-tui");
-        assert_eq!(request.headers()["version"], "0.154.0");
+        assert_eq!(request.headers()["originator"], "codex_cli_rs");
+        assert!(!request.headers().contains_key("version"));
         assert_eq!(
             request.headers()[USER_AGENT],
-            "codex-tui/0.154.0 (Mac OS 26.5.2; arm64) iTerm.app/3.6.11 (codex-tui; 0.154.0)"
+            "codex_cli_rs/0.155.0 (Mac OS 26.3.1; arm64) iTerm.app/3.6.9"
         );
         assert_eq!(request.headers()[ACCEPT], "application/json");
         assert!(!request.headers().contains_key("session_id"));
+        assert!(!request.headers().contains_key("x-codex-routing-hint"));
         assert!(request.body().is_none());
     }
 
@@ -424,11 +449,18 @@ mod tests {
         assert_eq!(request.headers()[AUTHORIZATION], "Bearer 1234567890abcdef");
         assert_eq!(request.headers()["originator"], "codex-tui");
         assert_eq!(request.headers()["version"], "0.154.0");
-        assert_eq!(request.headers()[USER_AGENT], headers[USER_AGENT]);
+        assert_eq!(
+            request.headers()[USER_AGENT],
+            "codex-tui/0.154.0 (Mac OS 26.5.2; arm64) iTerm.app/3.6.11 (codex-tui; 0.154.0)"
+        );
         assert!(!request.headers().contains_key("chatgpt-account-id"));
         assert_eq!(request.headers()[ACCEPT], "text/event-stream");
         assert_eq!(request.headers()[CONTENT_TYPE], "application/json");
         assert_eq!(request.headers()["openai-beta"], "responses=experimental");
+        assert_eq!(
+            request.headers()["x-codex-routing-hint"],
+            "model=gpt-free-model"
+        );
         assert!(!request.headers().contains_key("x-codex-turn-state"));
         assert!(!request
             .headers()
@@ -442,12 +474,24 @@ mod tests {
 
         let body: Value =
             serde_json::from_slice(request.body().unwrap().as_bytes().unwrap()).unwrap();
-        assert_eq!(body["model"], "gpt-free-model");
-        assert_eq!(body["stream"], true);
-        assert_eq!(body["store"], false);
-        assert_eq!(body["tools"], json!([]));
-        assert_eq!(body["input"][0]["content"][0]["text"], "Reply OK.");
-        assert!(body.get("parallel_tool_calls").is_none());
+        assert_eq!(
+            body,
+            json!({
+                "model": "gpt-free-model",
+                "instructions": "",
+                "input": [{
+                    "type": "message",
+                    "role": "user",
+                    "content": [{ "type": "input_text", "text": "Reply OK." }]
+                }],
+                "tools": [],
+                "tool_choice": "auto",
+                "reasoning": null,
+                "store": false,
+                "stream": true,
+                "include": []
+            })
+        );
     }
 
     #[test]
@@ -460,6 +504,8 @@ mod tests {
         assert!(valid_model_slug("sol"));
         assert!(valid_model_slug("gpt-5.1-codex-mini"));
         assert!(!valid_model_slug("model name"));
+        assert!(!valid_model_slug("model;tier=priority"));
+        assert!(!valid_model_slug("model\r\nx-injected: true"));
     }
 
     #[test]
@@ -476,6 +522,17 @@ mod tests {
             Some(false)
         );
         assert_eq!(availability_with_code(200, "server_is_overloaded"), None);
+        for code in [
+            "model_not_available",
+            "model_not_found",
+            "unsupported_model",
+        ] {
+            assert_eq!(availability_with_code(403, code), None);
+            assert_eq!(availability_with_code(200, code), None);
+        }
+        assert_eq!(availability_with_code(429, "rate_limit_exceeded"), None);
+        assert_eq!(availability_with_code(503, "server_is_overloaded"), None);
+        assert_eq!(availability_with_code(401, "invalid_api_key"), Some(false));
     }
 
     #[test]
