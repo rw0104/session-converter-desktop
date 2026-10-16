@@ -6,9 +6,9 @@ use uuid::Uuid;
 
 const CHATGPT_CODEX_BASE_URL: &str = "https://chatgpt.com/backend-api/codex";
 // The audited upstream uses distinct identities for catalog and Responses requests.
-const CODEX_MODELS_CLIENT_VERSION: &str = "0.155.0";
+const CODEX_MODELS_CLIENT_VERSION: &str = "0.159.0";
 const CODEX_MODELS_ORIGINATOR: &str = "codex_cli_rs";
-const CODEX_MODELS_USER_AGENT: &str = "codex_cli_rs/0.155.0 (Mac OS 26.3.1; arm64) iTerm.app/3.6.9";
+const CODEX_MODELS_USER_AGENT: &str = "codex_cli_rs/0.159.0 (Mac OS 26.3.1; arm64) iTerm.app/3.6.9";
 const CODEX_RESPONSE_CLIENT_VERSION: &str = "0.154.0";
 const CODEX_RESPONSE_ORIGINATOR: &str = "codex-tui";
 const CODEX_RESPONSE_USER_AGENT: &str =
@@ -414,7 +414,7 @@ mod tests {
         assert_eq!(request.method(), reqwest::Method::GET);
         assert_eq!(
             request.url().as_str(),
-            "https://chatgpt.com/backend-api/codex/models?client_version=0.155.0"
+            "https://chatgpt.com/backend-api/codex/models?client_version=0.159.0"
         );
         assert_eq!(request.headers()[AUTHORIZATION], "Bearer 1234567890abcdef");
         assert_eq!(request.headers()["chatgpt-account-id"], "account_123");
@@ -422,7 +422,7 @@ mod tests {
         assert!(!request.headers().contains_key("version"));
         assert_eq!(
             request.headers()[USER_AGENT],
-            "codex_cli_rs/0.155.0 (Mac OS 26.3.1; arm64) iTerm.app/3.6.9"
+            "codex_cli_rs/0.159.0 (Mac OS 26.3.1; arm64) iTerm.app/3.6.9"
         );
         assert_eq!(request.headers()[ACCEPT], "application/json");
         assert!(!request.headers().contains_key("session_id"));

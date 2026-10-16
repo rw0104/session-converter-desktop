@@ -1,18 +1,18 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-10-14",
+  "updatedAt": "2026-10-16",
   "upstreams": [
     {
       "id": "cliproxyapi",
       "label": "CLIProxyAPI",
       "repository": "router-for-me/CLIProxyAPI",
       "branch": "main",
-      "auditedCommit": "a270e7b9e57aaecd8f82555f44c2108518ad2330",
-      "auditedDate": "2026-09-29",
+      "auditedCommit": "e7003d2a3e2cee2d45f9950c067bf8e02a2ac0f8",
+      "auditedDate": "2026-10-16",
       "files": [
         {
           "path": "internal/auth/codex/token.go",
-          "blobSha": "05d95d9b4728c2a832ebf4a8a170898b2f788220"
+          "blobSha": "15a4eca1e90d1ac0bef5ddc15686bc243e0bfafc"
         },
         {
           "path": "internal/auth/codex/jwt_parser.go",
@@ -20,11 +20,11 @@
         },
         {
           "path": "cmd/fetch_codex_models/main.go",
-          "blobSha": "607cf77b8487ab27537f2e55c6de132220c9b9e1"
+          "blobSha": "2fc2c2628ac0de1ec316eea3122e5774ef6aa978"
         },
         {
           "path": "internal/runtime/executor/codex_executor_request.go",
-          "blobSha": "6e948f9bd3acb3071531f19ace19d38a6f746689"
+          "blobSha": "bfb6cef70f8e4226937f96de3b76febdd763392e"
         }
       ]
     },
@@ -33,12 +33,12 @@
       "label": "sub2api",
       "repository": "Wei-Shaw/sub2api",
       "branch": "main",
-      "auditedCommit": "9c2cca9e627291bc719bada3d57de23b625a4180",
-      "auditedDate": "2026-10-14",
+      "auditedCommit": "b0a02a3304a0a78cdd003ddda1dd23ba02c03084",
+      "auditedDate": "2026-10-16",
       "files": [
         {
           "path": "backend/internal/handler/admin/account_codex_import.go",
-          "blobSha": "0de807866998e3e1d6ee77aeca9dd52b9704fa6a"
+          "blobSha": "8337488931975b24b376338491a69371030bac5b"
         },
         {
           "path": "backend/internal/pkg/openai/oauth.go",

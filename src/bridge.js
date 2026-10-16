@@ -9,21 +9,21 @@
       id: "cliproxyapi",
       label: "CLIProxyAPI",
       branch: "main",
-      shortSha: "a270e7b9",
-      fullSha: "a270e7b9e57aaecd8f82555f44c2108518ad2330",
-      date: "2026-09-29",
+      shortSha: "e7003d2a",
+      fullSha: "e7003d2a3e2cee2d45f9950c067bf8e02a2ac0f8",
+      date: "2026-10-16",
       repoUrl: "https://github.com/router-for-me/CLIProxyAPI",
-      commitUrl: "https://github.com/router-for-me/CLIProxyAPI/commit/a270e7b9e57aaecd8f82555f44c2108518ad2330",
+      commitUrl: "https://github.com/router-for-me/CLIProxyAPI/commit/e7003d2a3e2cee2d45f9950c067bf8e02a2ac0f8",
     }),
     Object.freeze({
       id: "sub2api",
       label: "sub2api",
       branch: "main",
-      shortSha: "9c2cca9e",
-      fullSha: "9c2cca9e627291bc719bada3d57de23b625a4180",
-      date: "2026-10-14",
+      shortSha: "b0a02a33",
+      fullSha: "b0a02a3304a0a78cdd003ddda1dd23ba02c03084",
+      date: "2026-10-16",
       repoUrl: "https://github.com/Wei-Shaw/sub2api",
-      commitUrl: "https://github.com/Wei-Shaw/sub2api/commit/9c2cca9e627291bc719bada3d57de23b625a4180",
+      commitUrl: "https://github.com/Wei-Shaw/sub2api/commit/b0a02a3304a0a78cdd003ddda1dd23ba02c03084",
     }),
   ]);
   // END GENERATED UPSTREAM PINS
@@ -242,6 +242,11 @@
       target[outKey] = value;
     } else if (typeof value === "boolean") {
       target[outKey] = value;
+    } else if (value && typeof value === "object" && !Array.isArray(value)) {
+      // CodexTokenStorage now carries the SIWC credential section as a nested
+      // object. Clone JSON-shaped metadata so conversions do not retain a
+      // reference to the parsed input object.
+      target[outKey] = JSON.parse(JSON.stringify(value));
     }
   }
 
@@ -338,6 +343,8 @@
       "chatgpt_account_is_fedramp",
       "openai_auth_mode",
       "auth_mode",
+      "use_siwc",
+      "siwc",
       // account_codex_import.go protected keys; CPA never emits these today,
       // they are carried for forward compatibility with Agent Identity.
       "agent_runtime_id",
@@ -499,6 +506,8 @@
         "chatgpt_account_is_fedramp",
         "openai_auth_mode",
         "auth_mode",
+        "use_siwc",
+        "siwc",
       ]) {
         addKnownCredential(auth, creds, key);
       }

@@ -582,6 +582,32 @@ function testBridgeCodexPlanTypeFallbackAndRoundTrips() {
   }
 }
 
+function testBridgeCodexSiwcFieldsRoundTrip() {
+  const { context } = loadPageScript();
+  const bridge = context.SessionConverterBridge;
+  const siwc = {
+    access_token: "siwc-access",
+    refresh_token: "siwc-refresh",
+    account_id: "workspace-1",
+  };
+  const cpa = {
+    type: "codex",
+    access_token: "oauth-access-token",
+    account_id: "account-siwc",
+    use_siwc: true,
+    siwc,
+  };
+
+  const sub = bridge.convertCPARecord({ name: "siwc.json", value: cpa });
+  assert.equal(sub.account.credentials.use_siwc, true);
+  assert.deepEqual(sub.account.credentials.siwc, siwc);
+  assert.notEqual(sub.account.credentials.siwc, siwc);
+
+  const roundTrip = bridge.convertSubAccount({ name: "siwc.json", value: sub.account });
+  assert.equal(roundTrip.account.use_siwc, true);
+  assert.deepEqual(roundTrip.account.siwc, siwc);
+}
+
 function testBridgeDoesNotDefaultCodexPlanForOtherProviders() {
   const { context } = loadPageScript();
   const bridge = context.SessionConverterBridge;
@@ -1714,6 +1740,7 @@ async function main() {
   testSyntheticIdTokenHasCodexParseableJwtFormat();
   testSessionCpaPlanTypeMatchesUpstreamDefaultAndClaims();
   testBridgeCodexPlanTypeFallbackAndRoundTrips();
+  testBridgeCodexSiwcFieldsRoundTrip();
   testBridgeDoesNotDefaultCodexPlanForOtherProviders();
   testAxonHubAuthJsonUsesPlaceholderRefreshTokenWhenMissing();
   testAxonHubAuthJsonPreservesRealRefreshToken();

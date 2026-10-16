@@ -11,8 +11,8 @@
 
 | 目标格式 | 源仓库 | 钉死提交 | 日期 | 核心依据 |
 | --- | --- | --- | --- | --- |
-| CPA / Codex 模型检测 | [router-for-me/CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) | `a270e7b9e57aaecd8f82555f44c2108518ad2330`（短：`a270e7b9`） | 2026-09-29 | `internal/auth/codex/token.go`、`jwt_parser.go`、`cmd/fetch_codex_models/main.go`、`internal/runtime/executor/codex_executor_request.go` |
-| sub2api | [Wei-Shaw/sub2api](https://github.com/Wei-Shaw/sub2api) | `42bc7f6cffe24bcb471608e48e66b4a0afa1f882`（短：`42bc7f6c`） | 2026-09-30 | `backend/internal/handler/admin/account_codex_import.go`、`backend/internal/pkg/openai/oauth.go`（`ClientID`） |
+| CPA / Codex 模型检测 | [router-for-me/CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) | `e7003d2a3e2cee2d45f9950c067bf8e02a2ac0f8`（短：`e7003d2a`） | 2026-10-16 | `internal/auth/codex/token.go`、`jwt_parser.go`、`cmd/fetch_codex_models/main.go`、`internal/runtime/executor/codex_executor_request.go` |
+| sub2api | [Wei-Shaw/sub2api](https://github.com/Wei-Shaw/sub2api) | `b0a02a3304a0a78cdd003ddda1dd23ba02c03084`（短：`b0a02a33`） | 2026-10-16 | `backend/internal/handler/admin/account_codex_import.go`、`backend/internal/pkg/openai/oauth.go`（`ClientID`） |
 
 页面顶部将「软件更新」和「算法映射状态」分开。软件更新只读取本仓库签名 Release；算法检测读取 `config/upstream-audit.json`，比较上表 6 个真正相关文件在上游 `main` 树中的 Git blob SHA，不再用整个仓库 HEAD 判断算法变化。算法上游源码不会被下载或执行。
 
@@ -93,5 +93,7 @@ Agent Identity 行为要点（对齐 `2730c1c4`）：
 
 - 2026-09-30（v0.1.12）：逐文件复核 CLIProxyAPI `7fa443dc → a270e7b9`，更新全部四个相关 blob。`CodexTokenStorage` 新增 `plan_type`；Session → CPA / sub2api 和 CPA ↔ sub2api 的 Codex 账户统一保留非空字符串套餐，缺失时依次读取 ID JWT、access JWT，最终回落为 `free`。未知套餐名称保持原值，真实令牌不改写，其他提供商不注入默认套餐。
 - 2026-09-30（v0.1.12）：模型目录请求独立对齐 `codex_cli_rs/0.155.0 (Mac OS 26.3.1; arm64) iTerm.app/3.6.9`、`Originator: codex_cli_rs` 和 `client_version=0.155.0`，按上游拉取器移除该请求的 `Version`。Responses 执行器仍使用 `codex-tui/0.154.0 (Mac OS 26.5.2; arm64) iTerm.app/3.6.11 (codex-tui; 0.154.0)`；本应用保留对应 `Originator` 和自身客户端 `Version: 0.154.0`，新增 `X-Codex-Routing-Hint: model=<实际选中的模型>`。探测不请求 service tier，因此不添加 `tier`。保留现有 `session_id`；目标提交的 HTTP Mac OS fallback 仍发送 `Session_id`，CPA helper 显式兼容两种拼写，这不代替服务端实网验证。上游的套餐刷新写回、v8 导入路径、translation envelope / update-intent、identity-confuse 移除及按账号配置的 cloaking 属于代理实现，不加入本地无刷新、无持久化的直连流程。sub2api 两个相关 blob 未变，复核至 `42bc7f6c`；原始转换来源仍为 `a097eb15`。验证范围和证据见 [v0.1.12 发布复核](2026-09-30_release-v0.1.12-report.md)。
+
+- 2026-10-16（v0.1.13）：复核 CLIProxyAPI `a270e7b9 → e7003d2a` 与 sub2api `9c2cca9e → b0a02a33`。CLIProxyAPI 新增 SIWC 凭据字段并将模型目录客户端身份升至 `codex_cli_rs/0.159.0`；本应用保留 `siwc` / `use_siwc`，并同步模型探测身份。sub2api 变化是服务端账号去重键按 workspace/account 与 user 组合隔离，本地转换器不实现服务端索引。验证范围和证据见 [v0.1.13 发布复核](2026-10-16_release-v0.1.13-report.md)。
 
 本地检测只筛除确认 401、402、403 或本地确认过期的转换项，不改写其余输出字段。真实模型检测会产生极少量模型用量。后续升级必须重新核对 CLIProxyAPI / sub2api 账户 schema 与官方 Codex 请求协议，并执行安全审计、上游测试和桌面应用回归测试。
