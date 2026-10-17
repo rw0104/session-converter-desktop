@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-10-16",
+  "updatedAt": "2026-10-17",
   "upstreams": [
     {
       "id": "cliproxyapi",
       "label": "CLIProxyAPI",
       "repository": "router-for-me/CLIProxyAPI",
       "branch": "main",
-      "auditedCommit": "e7003d2a3e2cee2d45f9950c067bf8e02a2ac0f8",
+      "auditedCommit": "911f49cbd49f4fe2516979754a7488a3fd14fe64",
       "auditedDate": "2026-10-16",
       "files": [
         {
