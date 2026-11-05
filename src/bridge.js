@@ -19,11 +19,11 @@
       id: "sub2api",
       label: "sub2api",
       branch: "main",
-      shortSha: "6f92090d",
-      fullSha: "6f92090d7f540efd88cd4b81e651120cb36e3ff5",
-      date: "2026-11-04",
+      shortSha: "25608d21",
+      fullSha: "25608d216bb7be04e4a646830cb065cd09b7d7e9",
+      date: "2026-11-05",
       repoUrl: "https://github.com/Wei-Shaw/sub2api",
-      commitUrl: "https://github.com/Wei-Shaw/sub2api/commit/6f92090d7f540efd88cd4b81e651120cb36e3ff5",
+      commitUrl: "https://github.com/Wei-Shaw/sub2api/commit/25608d216bb7be04e4a646830cb065cd09b7d7e9",
     }),
   ]);
   // END GENERATED UPSTREAM PINS
